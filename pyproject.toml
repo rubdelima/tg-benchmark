@@ -1,0 +1,27 @@
+[project]
+name = "tg-bench"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12.7"
+dependencies = [
+    "annoy>=1.17.3",
+    "datasets>=4.4.1",
+    "hf-xet>=1.2.0",
+    "huggingface>=0.0.1",
+    "langchain>=1.0.7",
+    "langchain-ollama>=1.0.0",
+    "mypy>=1.18.2",
+    "ollama>=0.6.1",
+    "pydantic>=2.12.4",
+    "pylint>=4.0.3",
+    "rich>=14.2.0",
+]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.1.0",
+    "ipywidgets>=8.1.8",
+    "jupyter>=1.1.1",
+    "nest-asyncio>=1.6.0",
+]
