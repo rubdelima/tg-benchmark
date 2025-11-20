@@ -22,6 +22,13 @@ class TestCase(BaseModel):
 class TestSuite(BaseModel):
     test_cases: List[TestCase]
     test_code_raw:str
+    
+    def test_cases_summary(self) -> str:
+        summary = "Code for tests:\n"
+        summary += self.test_code_raw + "\n\n" + "Test Cases Summary:\n"
+        for i, tc in enumerate(self.test_cases):
+            summary += f"Test Case {i+1}:\nInput: {tc.inputs}\nExpected Output: {tc.expected_output}\n\n"
+        return summary.strip()
 
 class FunctionArgs(BaseModel):
     name: str
@@ -42,6 +49,8 @@ class Task(BaseTask):
     evidence: Optional[str] = None
     template : str = ''
     best_solution: str = ''
+    best_solution_rating: float = 0.0
+    task_resolution_template: str = ''
     code: str =''
     test_suite: TestSuite
     subproblems: List['Task'] = []
@@ -66,12 +75,15 @@ class PlanSolutions(PlanBase):
     solutions: List[BaseSolution]
 
 class PlanSubtasks(PlanBase):
+    skeleton:str
     subtasks: List[BaseTask]
 
 class PlanResponseModel(BaseModel):
-    result : List[PlanSolutions] | List[PlanSubtasks]
+    reasoning: Optional[str] = None
+    result_type : Literal['solutions', 'subtasks']
 
-class PlanResponse:
-    plan: PlanResponseModel
-    plan_type: Literal['solutions', 'subtasks']
+class PlanResponse(PlanResponseModel):
+    subtasks : Optional[List[BaseTask]] = None
+    solutions : Optional[List[BaseSolution]] = None
+    
 
