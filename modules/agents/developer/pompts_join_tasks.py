@@ -1,5 +1,5 @@
 from typing import List
-from modules.schema.task import Task
+from modules.schemas.task import Task
 
 system_join_tasks_prompt = """
 You are a skilled software developer tasked with integrating code from multiple subtasks into a single cohesive solution.

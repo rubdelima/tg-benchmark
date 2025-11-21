@@ -2,7 +2,7 @@ import ollama
 from annoy import AnnoyIndex
 from collections import OrderedDict
 
-from modules.schema.task import Task, BaseTask
+from modules.schemas.task import Task, BaseTask
 
 class VectorBuffer:
     def __init__(self, embedding_model="embeddinggemma", vector_dim=768, buffer_limit=5000, build_every=5):

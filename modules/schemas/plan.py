@@ -2,8 +2,8 @@ from typing import List, Optional, Literal
 
 from pydantic import BaseModel, Field
 
-from modules.schema.solution import BaseSolution
-from modules.schema.task import BaseTask
+from modules.schemas.solution import BaseSolution
+from modules.schemas.task import BaseTask
 
 class PlanSolutions(BaseModel):
     solutions: List[BaseSolution] = Field(..., description="A list of proposed solutions for the plan.")

@@ -8,7 +8,9 @@ from modules.agents.qa import Carlos
 from modules.agents.reseacher import Thifany
 
 from modules.buffer import VectorBuffer
-from modules.models import BaseTask, Task, Solution, BaseSolution, TestSuiteComplete
+from modules.schemas.task import Task, BaseTask
+from modules.schemas.solution import Solution, BaseSolution
+from modules.schemas.tests import TestSuiteComplete
 from modules.ollama import OllamaHandler
 
 
@@ -26,6 +28,9 @@ class OrchestratorConfig(BaseModel):
     use_buffer: bool = Field(
         False, description="Enable use of vector buffer (RAG) for similar task retrieval and solution candidate enrichment."
     )
+    ignore_warnings: bool = Field(
+        True, description="Whether to ignore warnings during type checking and code analysis."
+    )
 
 
 class Vivi:
@@ -36,14 +41,17 @@ class Vivi:
         self.max_retry = orchestrator_config.max_retry
         self.judge_level = orchestrator_config.judge_level
         self.use_buffer = orchestrator_config.use_buffer
+        self.ignore_warnings = orchestrator_config.ignore_warnings
 
         # Agentes
         self.ollama_handler = OllamaHandler(
             model_name=orchestrator_config.model, temperature=0.5, keep_alive=True)
-        self.dev = Ellian(ollama_handler=self.ollama_handler,
-                          verbosity=orchestrator_config.dev_verbosity, generation_retry_attempts=self.max_retry)
-        self.judge = Will(ollama_handler=self.ollama_handler)
-        self.qa = Carlos(ollama_handler=self.ollama_handler, retry_attempts=self.max_retry)
+        self.dev = Ellian(
+            ollama_handler=self.ollama_handler, verbosity=orchestrator_config.dev_verbosity, generation_retry_attempts=self.max_retry, ignore_warnings=self.ignore_warnings)
+        self.judge = Will(
+            ollama_handler=self.ollama_handler)
+        self.qa = Carlos(
+            ollama_handler=self.ollama_handler, retry_attempts=self.max_retry)
         self.researcher = Thifany(
             ollama_handler=self.ollama_handler, vector_buffer=VectorBuffer())
 
@@ -88,11 +96,15 @@ class Vivi:
             solution = self.judge.judge_solution(solution)
         
         # 2. Gera o código para a solução
-        solution, code = self.dev.generate_solution_code(solution)
+        solution= self.dev.generate_solution_code(solution)
         
         # 3. Se o nível do juiz for >= 1 o código é julgado pelo juiz
         if self.judge_level >= 1:
-            solution = self.judge.judge_code(solution, code)
+            is_correct, solution = self.judge.judge_code(solution)
+            if not is_correct:
+                solution = self.dev.generate_solution_code(solution)
+        
+        code = solution.solution_history[-1]['content']
         
         # 4. É feita a execução dos testes
         tests_result = self.qa.run_tests(tests_suite, code)
@@ -107,7 +119,7 @@ class Vivi:
             return solution
         
         # 7. Se não obteve sucesso total, o modelo juíz avalia o erro e formula os próximos passos que devem ser tomados para resolver o problema
-        solution = self.judge.analyze_test_failures(solution, tests_suite, tests_result, code)
+        solution = self.judge.analyze_test_failures(solution, tests_suite, tests_result)
         
         # 8. Retorna a solução atualizada
         return solution

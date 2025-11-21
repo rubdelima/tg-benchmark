@@ -1,11 +1,11 @@
 from dataclasses import dataclass
-from typing import List, Dict
+from typing import List, Dict, Tuple
 
 from modules.ollama import OllamaHandler, ChatResponse
 from modules.agents.generator_code import GeneratorCodeBaseModel, CheckResult
 
-from modules.schema.task import Task
-from modules.schema.solution import Solution
+from modules.schemas.task import Task
+from modules.schemas.solution import Solution
 
 from .prompts_dev_verbosity import get_verbosity_prompt
 from .pompts_join_tasks import join_tasks, system_join_tasks_prompt
