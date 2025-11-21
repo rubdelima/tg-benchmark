@@ -2,14 +2,14 @@ import ollama
 from annoy import AnnoyIndex
 from collections import OrderedDict
 
-from modules.models import Task, BaseTask
+from modules.schema.task import Task, BaseTask
 
 class VectorBuffer:
     def __init__(self, embedding_model="embeddinggemma", vector_dim=768, buffer_limit=5000, build_every=5):
         self.embedding_model = embedding_model
         self.vector_dim = vector_dim
         self.annoy = AnnoyIndex(vector_dim, 'angular')
-        self.inmem_buffer: OrderedDict[int, Task] = OrderedDict()
+        self.inmem_buffer: OrderedDict[int, Task] = OrderedDict() #type:ignore
         self.vector_map = {}  # {id: embedding}
         self._next_id = 0
         self.buffer_limit = buffer_limit

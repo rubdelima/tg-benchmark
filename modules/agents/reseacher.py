@@ -5,13 +5,9 @@ from modules.ollama import OllamaHandler, ChatResponse
 import re
 import json
 
-decide_plan_system_prompt = """
-You are an expert agent for analyzing and structuring Python programming tasks.
-
-# USER TASK INPUT (each field explained):
-
+user_task_input = """
 - Definition: Clear description of what the task must accomplish, in practical terms.
-- Function Name: The name of the function that represents the purpose of the task; may be used for context, but does not need to be reused as-is.
+- Function Name: The name of the function that represents the purpose of the task.
 - Parameters: List of all required parameters, including each parameter's name, type (e.g., str, int, list, dict), and a brief description of its role or expected content.
 - Definition of Done: Exact acceptance criteria—what conditions or output must be met for the task to be considered successfully completed.
 - TEST CASES: Example input(s) and output(s) illustrating expected behavior; serves to clarify requirements and edge cases for the solution.
@@ -20,7 +16,13 @@ You are an expert agent for analyzing and structuring Python programming tasks.
     - Definition of Done: Its corresponding acceptance criteria.
     - Solution Rating: A float between 0.0 (failed all tests) and 1.0 (passed all tests); indicates how robust and correct the solution approach was. If rating is low (e.g., < 0.5), treat such solutions as warnings/examples to avoid; if high, they may be used as positive design references.
     - Resolution Template: A brief summary (or pseudocode description) of the approach and algorithm used for that similar task—not necessarily the exact code.
+"""
 
+decide_plan_system_prompt = """
+You are an expert agent for analyzing and structuring Python programming tasks.
+
+# USER TASK INPUT:
+""" + user_task_input + """
 # INSTRUCTION:
 Reflect deeply on the above task using the following 5 numbered and detailed reasoning steps:
 
@@ -96,13 +98,7 @@ You are an expert agent specializing in decomposing complex tasks into a clear, 
 
 ## 1. User Input Explanation
 
-You will receive, for each new problem:
-- DEFINITION: Description of the task’s overall goal and requirements.
-- FUNCTION NAME: Main function name for context (not necessarily to reuse).
-- PARAMETERS: Names, types, and descriptions of required parameters.
-- DEFINITION OF DONE: What constitutes success for this task.
-- TEST CASES: Example input/output pairs defining behavior.
-- SIMILAR TASKS FROM MEMORY: Previous similar tasks for reference (if any).
+""" + user_task_input + """
 
 ## 2. Reasoning Process
 
@@ -273,12 +269,7 @@ system_generate_solutions_prompt = """
 You are an expert agent specializing in planning approaches to fully solve programming tasks.
 You will always receive a single task description, with these fields (never more than one task at a time):
 
-- DEFINITION: Full description of the problem and what the task must accomplish.
-- FUNCTION NAME: Suggested name for the function (for context only).
-- PARAMETERS: List of all required parameters: name, type (e.g., str, int, list, dict), description.
-- DEFINITION OF DONE: Exact criteria to consider the solution correct.
-- TEST CASES: Example input(s)/output(s).
-- SIMILAR TASKS FROM MEMORY: Related past tasks (optional, for guidance).
+""" + user_task_input + """
 
 **Your job is:**
 - Carefully read and understand the task in context.
