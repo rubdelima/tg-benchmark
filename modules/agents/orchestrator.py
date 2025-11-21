@@ -88,7 +88,7 @@ class Vivi:
             solution = self.judge.judge_solution(solution)
         
         # 2. Gera o código para a solução
-        solution, code = self.dev.generate_code(solution)
+        solution, code = self.dev.generate_solution_code(solution)
         
         # 3. Se o nível do juiz for >= 1 o código é julgado pelo juiz
         if self.judge_level >= 1:

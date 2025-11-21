@@ -1,11 +1,3 @@
-from dataclasses import dataclass
-from typing import Union, Literal, List
-
-from modules.ollama import OllamaHandler, ChatResponse
-from modules.agents.utils import parse_code
-from modules.models import Solution, Task, BaseTask, BaseSolution
-
-
 system_prompt_base = \
 """
 You are an efficient software developer.
@@ -130,72 +122,13 @@ strings_list.sort()
 for string in strings_list:  
     print(string)
 """
+
 verbosity_dict = {
     0: system_prompt_verbosity_0,
     1: system_prompt_verbosity_1,
     2: system_prompt_verbosity_2,
 }
 
-class DeveloperGenerationError(Exception):
-    def __init__(self, text, *args, messages: list[dict]):
-        super().__init__(text, *args)
-        self.text = text
-        self.messages = messages
-
-@dataclass
-class Ellian:
-    ollama_handler: OllamaHandler
-    verbosity: int = 0
-    generation_retry_attempts: int = 3
-
-    def generate_code(self, solution: Solution) -> Solution:
-        messages = [
-            {"role": "system", "content": verbosity_dict.get(
-                self.verbosity, system_prompt_verbosity_0)},
-            *self.extract_solution_messages(solution)
-        ]
-        for _ in range(self.generation_retry_attempts):
-            response = self.ollama_handler.generate_response(messages=messages)
-            assert isinstance(response, ChatResponse) and isinstance(
-                response.response, str)
-
-            try:
-                parsed_code = parse_code(response.response)
-                if not solution.best_code:
-                    solution.best_code = parsed_code
-                
-                solution.solution_history.append({
-                    "role": "developer",
-                    "content": parsed_code
-                })
-                
-                return solution
-
-            except ValueError as e:
-                messages.append(response.raw_response)
-                messages.append({
-                    "role": "user",
-                    "content": (
-                        "The code you provided has syntax errors. "
-                        "Please review the code and provide a corrected version that is valid Python code. "
-                        "Here is the error message:\n"
-                        f"{str(e)}"
-                    )
-                })
-                
-        raise DeveloperGenerationError("Failed to generate valid Python code after multiple attempts.", messages=messages)
-    
-    def join_subtasks_code(self, main_task:Task, subtasks:List[Task], skeleton:str)->str:
-        #TODO: Implement method to join code from subtasks into main task code
-        pass
-    
-    @staticmethod
-    def extract_solution_messages(solution: Solution) -> list[dict]:
-        messages = []        
-        for history_entry in solution.solution_history:
-            messages.append({
-                "role" : "assistant" if history_entry['role'] == "developer" else "user",
-                "content" : history_entry['content']
-            })
-        return messages
-
+def get_verbosity_prompt(verbosity_level: int) -> str:
+    verbosity_level = max(0, min(2, verbosity_level))
+    return verbosity_dict.get(verbosity_level, system_prompt_verbosity_0)

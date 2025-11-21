@@ -7,7 +7,7 @@ import sys
 for line in sys.stdin:
     try:
         num1, num2 = line.strip().split(",")
-        result = sum_two_numbers(int(num1), int(num2))
+        result = sum_two_numbers(num1, num2)
         print(result)
     except ValueError:
         print('ValueError')

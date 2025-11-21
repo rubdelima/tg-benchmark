@@ -6,6 +6,13 @@ class FunctionArgs(BaseModel):
     name: str = Field(..., description="Name of the function argument")
     type: str = Field(..., description="Type of the function argument")
     description: Optional[str] = Field(None, description="Description of the function argument")
+    
+    def show(self, num_tabs: int =0) -> str:
+        return (
+            f"{'\t' * num_tabs}{self.name}: "
+            f"{'\t' * (num_tabs + 1)}TYPE: {self.type}"
+            f"{'\t' * (num_tabs + 1)}DESCRIPTION: {self.description}"
+        )
 
 class BaseTask(BaseModel):
     definition: str = Field(..., description="Definition of the task")

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 from modules.models import TestSuite, BaseTask, ErrorDetail, TestsResult, TestSuiteComplete
 from modules.ollama import OllamaHandler
-from modules.agents.utils import parse_code
+from modules.agents.generator_code import parse_code
 
 qa_testsuite_prompt_template = \
 """
