@@ -1,13 +1,13 @@
 from dataclasses import dataclass
-from typing import Union, Literal
+from typing import Union, Literal, List
 
 from modules.ollama import OllamaHandler, ChatResponse
 from modules.agents.utils import parse_code
-from modules.models import Solution
+from modules.models import Solution, Task, BaseTask, BaseSolution
 
 
 system_prompt_base = \
-    """
+"""
 You are an efficient software developer.
 Given user input, you must write code that follows the exact steps requested by the user.
 """
@@ -184,6 +184,10 @@ class Ellian:
                 })
                 
         raise DeveloperGenerationError("Failed to generate valid Python code after multiple attempts.", messages=messages)
+    
+    def join_subtasks_code(self, main_task:Task, subtasks:List[Task], skeleton:str)->str:
+        #TODO: Implement method to join code from subtasks into main task code
+        pass
     
     @staticmethod
     def extract_solution_messages(solution: Solution) -> list[dict]:

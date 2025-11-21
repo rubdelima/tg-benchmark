@@ -524,7 +524,7 @@ class Thifany:
             context += f"- Definition: {task.definition}\n"
             context += f"- Definition of Done: {task.dod}\n"
             context += f"- Solution Rating: {task.best_solution_rating}\n"
-            context += f"- Resolution Template: {task.task_resolution_template}\n\n"
+            context += f"- Resolution Template: {task.template}\n\n"
         
         return context
     
@@ -567,10 +567,8 @@ class Thifany:
     
     def save_history(self, task:Task)->str:
         task_dict = task.model_dump()
-        del task_dict['subproblems']
         del task_dict['test_suite']
         del task_dict['template']
-        del task_dict['up_task']
         del task_dict['function_name']
         del task_dict['args']
         del task_dict['keywords']

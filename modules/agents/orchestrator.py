@@ -1,17 +1,140 @@
-from typing import Literal
+from typing import List
 
-from dataclasses import dataclass
+from pydantic import BaseModel, Field
 
-from modules.models import BaseTask,Task, Solution
+from modules.agents.developer import Ellian
+from modules.agents.judge import Will
+from modules.agents.qa import Carlos
+from modules.agents.reseacher import Thifany
+
+from modules.buffer import VectorBuffer
+from modules.models import BaseTask, Task, Solution, BaseSolution, TestSuiteComplete
 from modules.ollama import OllamaHandler
 
 
-class Vivi:
-    def __init__(self, model, max_iter, max_retry, dev_verbosity, judge_level, controller_model, solution_search_algorithm:Literal["bfs", "dfs", "greedy"]="bfs"):
-        self.max_iter = max_iter
-        self.max_retry = max_retry
+class OrchestratorConfig(BaseModel):
+    model: str = Field(
+        ...,description="Name of the model to use for generation.")
+    max_iter: int = Field(
+        ..., description="Maximum number of task branching/generation iterations (controls recursion/fanout).")
+    max_retry: int = Field(
+        ..., description="Maximum number of consecutive attempts allowed for generating a valid solution or code block before failing.")
+    dev_verbosity: int = Field(
+        ..., description="Verbosity level for code output: 0 = no comments, 1 = user step as comments, 2 = comments plus technical explanations.")
+    judge_level: int = Field(
+        ..., description="Strictness level for the judge agent when evaluating solutions: 0=off, 1=checks if code solves the step, 2=evaluates robustness before codegen.")
+    use_buffer: bool = Field(
+        False, description="Enable use of vector buffer (RAG) for similar task retrieval and solution candidate enrichment."
+    )
 
-    def create_task(self, input_raw)->Task:
-    def decompose_task(self, task:) -> Task: ...
-    def merge_task(self, task_tree): ...
-    def solve_task(self, task, max_iter): ...
+
+class Vivi:
+    def __init__(self, orchestrator_config: OrchestratorConfig):
+        # Parâmetros de Teste
+        self.model_name = orchestrator_config.model
+        self.max_iter = orchestrator_config.max_iter
+        self.max_retry = orchestrator_config.max_retry
+        self.judge_level = orchestrator_config.judge_level
+        self.use_buffer = orchestrator_config.use_buffer
+
+        # Agentes
+        self.ollama_handler = OllamaHandler(
+            model_name=orchestrator_config.model, temperature=0.5, keep_alive=True)
+        self.dev = Ellian(ollama_handler=self.ollama_handler,
+                          verbosity=orchestrator_config.dev_verbosity, generation_retry_attempts=self.max_retry)
+        self.judge = Will(ollama_handler=self.ollama_handler)
+        self.qa = Carlos(ollama_handler=self.ollama_handler, retry_attempts=self.max_retry)
+        self.researcher = Thifany(
+            ollama_handler=self.ollama_handler, vector_buffer=VectorBuffer())
+
+    def solve_base_task(self, base_task: BaseTask, iteration: int) -> Task:
+        # O Primeiro passo é o QA Criar casos de teste para a task
+        task_test_suite = self.qa.create_tests_suite(base_task)
+
+        task = Task(test_suite=task_test_suite, **base_task.model_dump())
+
+        # Depois vamos para a abordagem de resolver a task, se será ramificar [subtasks] ou uma abordagem de partir para as soluções
+        solve_task_plan = self.researcher.plan(
+            base_task, task_test_suite, iteration <= self.max_iter, self.use_buffer)
+
+        # Caso a abordagem sugerida seja de subtasks, vamos resolver cada subtask recursivamente
+        if solve_task_plan.subtasks:
+            solved_tasks = []
+            for subtask in solve_task_plan.subtasks.subtasks:
+                solved_subtask = self.solve_base_task(subtask, iteration-1)
+                solved_tasks.append(solved_subtask)
+            # Depois vamos juntar as partes que foram feitas e criar o código final da task principal
+
+            task.code = self.dev.join_subtasks_code(
+                main_task=task, subtasks=solved_tasks, skeleton=solve_task_plan.subtasks.skeleton)
+            
+            code_results = self.qa.run_tests(task.test_suite, task.code)
+
+        elif solve_task_plan.solutions:
+            best_solution = self.solution_search(solve_task_plan.solutions, task.test_suite)
+            task.code = best_solution.best_code
+            task.best_solution
+
+        else:
+            raise ValueError("Plan must have either subtasks or solutions.")
+
+        task.template = self.researcher.save_history(task)
+
+        return task
+
+    def solve_solution(self, solution: Solution, tests_suite: TestSuiteComplete) -> Solution:
+        # 1. Caso o nível do juiz seja 2, julga a solução antes de gerar o código
+        if self.judge_level == 2:
+            solution = self.judge.judge_solution(solution)
+        
+        # 2. Gera o código para a solução
+        solution, code = self.dev.generate_code(solution)
+        
+        # 3. Se o nível do juiz for >= 1 o código é julgado pelo juiz
+        if self.judge_level >= 1:
+            solution = self.judge.judge_code(solution, code)
+        
+        # 4. É feita a execução dos testes
+        tests_result = self.qa.run_tests(tests_suite, code)
+        
+        # 5. Atualiza a taxa de sucesso da solução se for maior que a anterior
+        if tests_result.success_rate >= solution.success_rate:
+            solution.success_rate = tests_result.success_rate
+            solution.best_code = code
+        
+        # 6. Se a solução obteve sucesso total nos testes, é retornada a solução.
+        if tests_result.success_rate == 1.0:
+            return solution
+        
+        # 7. Se não obteve sucesso total, o modelo juíz avalia o erro e formula os próximos passos que devem ser tomados para resolver o problema
+        solution = self.judge.analyze_test_failures(solution, tests_suite, tests_result, code)
+        
+        # 8. Retorna a solução atualizada
+        return solution
+
+    def solution_search(self, base_solutions: List[BaseSolution], tests_suite:TestSuiteComplete) -> Solution:
+        # 1. Inicializa as soluções
+        solutions = []
+        for solution in base_solutions:
+            solutions.append(Solution(**solution.model_dump()))
+        
+        # 2. Incializa variáveis de controle
+        best_solution_rate = -1.0
+        best_solution = solutions[0]
+        
+        # 3. Loop de tentativas
+        for _ in range(self.max_retry):
+            # 3.1 Ordena as soluções pela taxa de sucesso (a solução mais promissora primeiro)
+            solutions = sorted(solutions, key=lambda s: s.success_rate, reverse=True)
+            # 3.2 Tenta resolver cada solução
+            for solution in solutions:
+                solution = self.solve_solution(solution, tests_suite)
+                # 3.2.1 Se a solução for perfeita, retorna imediatamente
+                if solution.success_rate == 1.0:
+                    return solution
+                # 3.2.2 Atualiza a melhor solução encontrada até agora
+                if solution.success_rate > best_solution_rate:
+                    best_solution_rate = solution.success_rate
+                    best_solution = solution
+        
+        return best_solution

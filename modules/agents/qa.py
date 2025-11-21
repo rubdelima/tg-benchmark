@@ -6,7 +6,7 @@ import time
 
 from dataclasses import dataclass
 
-from modules.models import TestSuite, BaseTask, ErrorDetail, TestsResult
+from modules.models import TestSuite, BaseTask, ErrorDetail, TestsResult, TestSuiteComplete
 from modules.ollama import OllamaHandler
 from modules.agents.utils import parse_code
 
@@ -176,6 +176,7 @@ def run_tests_parallel(test_suite, implementation):
         total_time=total_time,
         passed_tests=passed_tests,
         total_tests=total_tests,
+        success_rate=passed_tests / total_tests if total_tests > 0 else 0.0,
         errors=errors
     )
 
@@ -185,7 +186,7 @@ class Carlos:
     ollama_handler: OllamaHandler
     retry_attempts: int = 2
     
-    def create_tests_suite(self, task: BaseTask)->TestSuite:
+    def create_tests_suite(self, task: BaseTask)->TestSuiteComplete:
         messages = [
             {
                 "role": "system",
@@ -205,9 +206,9 @@ class Carlos:
             messages=messages,
             response_format=TestSuite # type:ignore
         )
-        return response.response # type:ignore
+        return TestSuiteComplete(function_name=task.function_name, **response.response.model_dump())# type:ignore
     
-    def run_tests(self, test_suite: TestSuite, implementation:str, function_name:str)->TestsResult:
+    def run_tests(self, test_suite: TestSuiteComplete, implementation:str)->TestsResult:
         test_code = test_suite.test_code_raw.replace(
             "# FUNCTION_IMPLEMENTATION_HERE", implementation)
         
@@ -220,7 +221,7 @@ class Carlos:
                         {
                             "role" : "system",
                             "content": adjust_code_prompt_template.format(
-                                function_name=function_name
+                                function_name=test_suite.function_name
                             )
                         },
                         {

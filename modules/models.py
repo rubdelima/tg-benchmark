@@ -13,6 +13,7 @@ class TestsResult(BaseModel):
   total_time: float
   passed_tests: int
   total_tests: int
+  success_rate: float
   errors: list[ErrorDetail]
 
 class TestCase(BaseModel):
@@ -30,6 +31,9 @@ class TestSuite(BaseModel):
             summary += f"Test Case {i+1}:\nInput: {tc.inputs}\nExpected Output: {tc.expected_output}\n\n"
         return summary.strip()
 
+class TestSuiteComplete(TestSuite):
+    function_name: str
+
 class FunctionArgs(BaseModel):
     name: str
     type: str
@@ -43,30 +47,22 @@ class BaseTask(BaseModel):
     keywords: List[str]
 
 class Task(BaseTask):
-    status: Literal['completed','running','fail']
-    up_task: Optional['Task'] = None
-    history: List[dict] = []
+    status: Literal['completed','running','fail'] = 'running'
+    test_suite: TestSuiteComplete    
     evidence: Optional[str] = None
     template : str = ''
     best_solution: str = ''
     best_solution_rating: float = 0.0
-    task_resolution_template: str = ''
     code: str =''
-    test_suite: TestSuite
-    subproblems: List['Task'] = []
 
 class BaseSolution(BaseModel):
     context: str
     propose_solution: str
 
 class Solution(BaseSolution):
-    status: Literal['success','pending','fail']
-    remaining_retrials: int
-    problem: Task
-    best_code: Optional[str] = None
+    best_code: str = ''
     success_rate: float = 0.0
     solution_history: List[dict] = []
-    template : str = ''
 
 class PlanBase(BaseModel):
     skeleton: str
@@ -83,7 +79,7 @@ class PlanResponseModel(BaseModel):
     result_type : Literal['solutions', 'subtasks']
 
 class PlanResponse(PlanResponseModel):
-    subtasks : Optional[List[BaseTask]] = None
+    subtasks : Optional[PlanSubtasks] = None
     solutions : Optional[List[BaseSolution]] = None
     
 
