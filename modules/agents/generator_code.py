@@ -8,11 +8,10 @@ from tempfile import NamedTemporaryFile
 
 from modules.ollama import OllamaHandler
 
-CODE_BLOCK_PATTERN = re.compile(r"```(?:python)?\s*(.*?)\s*```", re.DOTALL)
+CODE_BLOCK_PATTERN = re.compile(r"```(?:python|py)?\s*(.*?)\s*```", re.DOTALL | re.IGNORECASE)
 ERROR_RE = re.compile(r'^(?P<file>.+?):(?P<line>\d+): error: (?P<msg>.+?)(?: \[(?P<code>[^\]]+)\])?$')
 WARNING_RE = re.compile(r'^(?P<file>.+?):(?P<line>\d+): warning: (?P<msg>.+?)(?: \[(?P<code>[^\]]+)\])?$')
 ANSI_RE = re.compile(r'\x1b\[[0-9;]*m')
-
     
 @dataclass
 class CheckResult:
@@ -30,6 +29,16 @@ class GeneratorCodeBaseModel:
             return True
         except:
             return False
+    
+    @staticmethod
+    def clean_code(code: str) -> Optional[str]:
+        code_blocks =  CODE_BLOCK_PATTERN.findall(code)
+        if len(code_blocks) == 1:
+            return code_blocks[0].strip()
+        elif len(code_blocks) > 1:
+            return None
+        return code.strip()
+        
     
     @staticmethod
     def _mypy_check(code: str,ignore_warnings: bool,ignore_function: Optional[str] = None) -> CheckResult:

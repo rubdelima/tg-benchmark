@@ -33,8 +33,10 @@ class TestCase(BaseModel):
     inputs : str = Field(..., description="Input for the test case")
     expected_output: str = Field(..., description="Expected output for the test case")
 
-class TestSuite(BaseModel):
+class TestSuiteBase(BaseModel):
     test_cases: List[TestCase] = Field(..., description="List of test cases in the suite")
+
+class TestSuite(TestSuiteBase):
     test_code_raw:str = Field(..., description="Raw code for the test suite")
     
     def test_cases_summary(self, no_code=False) -> str:
