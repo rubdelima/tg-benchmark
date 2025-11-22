@@ -67,10 +67,13 @@ class Vivi:
             base_task, task_test_suite, iteration <= self.max_iter, self.use_buffer)
 
         # Caso a abordagem sugerida seja de subtasks, vamos resolver cada subtask recursivamente
+        assert ((solve_task_plan.solutions is None) ^ (solve_task_plan.subtasks is None)), \
+            "Either solutions or subtasks must be provided, not both"
+        
         task = \
-            self.solution_search(task, solve_task_plan.solutions) \
-            if solve_task_plan.result_type == 'solutions' \
-            else self.solve_subtasks(task,solve_task_plan.subtasks,iteration -1)
+            self.solution_search(task, solve_task_plan.solutions.solutions) \
+            if solve_task_plan.result_type == 'solutions' and solve_task_plan.solutions is not None \
+            else self.solve_subtasks(task,solve_task_plan.subtasks,iteration -1) #type: ignore
         
         # Atualiza o template de solução
         task.template = self.researcher.save_history(task)

@@ -18,6 +18,6 @@ class PlanResponseModel(BaseModel):
 
 class PlanResponse(PlanResponseModel):
     subtasks : Optional[PlanSubtasks] = Field(None, description="The breakdown of the main task into subtasks, if applicable.")
-    solutions : Optional[List[BaseSolution]] = Field(None, description="A list of proposed solutions for the plan, if applicable.")
+    solutions : Optional[PlanSolutions] = Field(None, description="A list of proposed solutions for the plan, if applicable.")
 
 __all__ = ["PlanSolutions", "PlanSubtasks", "PlanResponseModel", "PlanResponse"]
