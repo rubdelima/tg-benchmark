@@ -11,6 +11,7 @@ from modules.buffer import VectorBuffer
 from modules.schemas.task import Task, BaseTask
 from modules.schemas.solution import Solution, BaseSolution
 from modules.schemas.tests import TestSuiteComplete
+from modules.schemas.plan import PlanResponse
 from modules.ollama import OllamaHandler
 
 
@@ -66,37 +67,77 @@ class Vivi:
             base_task, task_test_suite, iteration <= self.max_iter, self.use_buffer)
 
         # Caso a abordagem sugerida seja de subtasks, vamos resolver cada subtask recursivamente
-        if solve_task_plan.subtasks:
-            solved_tasks = []
-            for subtask in solve_task_plan.subtasks.subtasks:
-                solved_subtask = self.solve_base_task(subtask, iteration-1)
-                solved_tasks.append(solved_subtask)
-            # Depois vamos juntar as partes que foram feitas e criar o código final da task principal
-
-            task.code = self.dev.join_subtasks_code(
-                main_task=task, subtasks=solved_tasks, skeleton=solve_task_plan.subtasks.skeleton)
-            
-            code_results = self.qa.run_tests(task.test_suite, task.code)
-
-        elif solve_task_plan.solutions:
-            best_solution = self.solution_search(solve_task_plan.solutions, task.test_suite)
-            task.code = best_solution.best_code
-            task.best_solution
-
-        else:
-            raise ValueError("Plan must have either subtasks or solutions.")
-
+        task = \
+            self.solution_search(task, solve_task_plan.solutions) \
+            if solve_task_plan.result_type == 'solutions' \
+            else self.solve_subtasks(task,solve_task_plan.subtasks,iteration -1)
+        
+        # Atualiza o template de solução
         task.template = self.researcher.save_history(task)
 
+        return task
+    
+    def solve_subtasks(self, task: Task, plan_subtask:PlanResponse, iteration: int) -> Task:
+        assert plan_subtask.subtasks is not None, "Subtasks must be provided for 'subtasks' plan type."
+        skeleton = plan_subtask.subtasks.skeleton
+        subtasks = plan_subtask.subtasks.subtasks
+        
+        solved_tasks = []
+        for subtask in subtasks:
+            solved_subtask = self.solve_base_task(subtask, iteration)
+            solved_tasks.append(solved_subtask)
+        
+        # Depois vamos juntar as partes que foram feitas e criar o código final da task principal
+        task.code = self.dev.join_subtasks_code(
+            main_task=task, subtasks=solved_tasks, skeleton=skeleton)
+        
+        # Vamos transformar a Task em Uma solução para fazer o loop de ajustes
+        
+        solution = Solution(
+            context=task.definition,
+            propose_solution=skeleton,
+            best_code=task.code,
+            success_rate=0.0,
+            solution_history=[{"role": "developer", "content": task.code}]
+        )
+        
+        retries = 0
+        
+        while True:
+            code = solution.solution_history[-1]['content']
+            
+            tests_result = self.qa.run_tests(task.test_suite, code)
+            
+            if tests_result.success_rate >= solution.success_rate:
+                solution.success_rate = tests_result.success_rate
+                solution.best_code = code
+            
+            if tests_result.success_rate == 1.0:
+                break
+            
+            solution = self.judge.analyze_test_failures(solution, task.test_suite, tests_result)
+            solution.context = task.definition
+            
+            if retries < self.max_retry:
+                solution = self.dev.generate_solution_code(solution)
+                retries += 1
+                continue
+            
+            break
+        
+        task.best_solution = solution.propose_solution
+        task.best_solution_rating = solution.success_rate
+        task.code = solution.best_code
+        
         return task
 
     def solve_solution(self, solution: Solution, tests_suite: TestSuiteComplete) -> Solution:
         # 1. Caso o nível do juiz seja 2, julga a solução antes de gerar o código
         if self.judge_level == 2:
-            solution = self.judge.judge_solution(solution)
+            is_correct, solution = self.judge.judge_solution(solution)
         
         # 2. Gera o código para a solução
-        solution= self.dev.generate_solution_code(solution)
+        solution = self.dev.generate_solution_code(solution)
         
         # 3. Se o nível do juiz for >= 1 o código é julgado pelo juiz
         if self.judge_level >= 1:
@@ -124,7 +165,7 @@ class Vivi:
         # 8. Retorna a solução atualizada
         return solution
 
-    def solution_search(self, base_solutions: List[BaseSolution], tests_suite:TestSuiteComplete) -> Solution:
+    def solution_search(self, task:Task, base_solutions: List[BaseSolution]) -> Task:
         # 1. Inicializa as soluções
         solutions = []
         for solution in base_solutions:
@@ -140,13 +181,20 @@ class Vivi:
             solutions = sorted(solutions, key=lambda s: s.success_rate, reverse=True)
             # 3.2 Tenta resolver cada solução
             for solution in solutions:
-                solution = self.solve_solution(solution, tests_suite)
-                # 3.2.1 Se a solução for perfeita, retorna imediatamente
-                if solution.success_rate == 1.0:
-                    return solution
+                solution = self.solve_solution(solution, task.test_suite)
                 # 3.2.2 Atualiza a melhor solução encontrada até agora
                 if solution.success_rate > best_solution_rate:
                     best_solution_rate = solution.success_rate
                     best_solution = solution
+                
+                # 3.2.1 Se a solução for perfeita, retorna imediatamente
+                if solution.success_rate == 1.0:
+                    break
+            if best_solution_rate == 1.0:
+                break
         
-        return best_solution
+        task.best_solution = best_solution.propose_solution
+        task.best_solution_rating = best_solution.success_rate
+        task.code = best_solution.best_code
+        
+        return task
