@@ -1,7 +1,7 @@
 from modules.dataloader import Dataloader
 from modules.test_runner import TestRunner
 from schemas.tests import TestSuiteBase
-from modules.ollama import OllamaHandler
+from modules.llm import OllamaHandler
 from agents import *
 from modules.logger import get_logger
 
@@ -12,7 +12,7 @@ data = Dataloader.load_jsonl("data/dataset.jsonl")
 example = data["1873_A"]
 test_suite = TestSuiteBase(test_cases=example.private_test_cases)
 
-ollama_handler = OllamaHandler(model_name="qwen3:0.6b")
+ollama_handler = OllamaHandler(model_name="phi4-mini-reasoning:3.8b")
 dev = Ellian(ollama_handler)
 qa = Carlos(ollama_handler)
 reseacher = Thifany(ollama_handler)

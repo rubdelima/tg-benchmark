@@ -7,7 +7,7 @@ from typing import Literal, Optional, List
 
 # Modules
 from modules.buffer import VectorBuffer
-from modules.ollama import OllamaHandler, ChatResponse
+from modules.llm import OllamaHandler, ChatResponse
 from modules.logger import StatusContext, get_logger
 
 # Schemas
@@ -94,12 +94,8 @@ class Thifany:
         with StatusContext("RESEARCHER: Creating resolution template from task history.") as status:
             logger.debug("RESEARCHER: Sending template creation prompt to Ollama.")
             start_time = time.time()
-            response = self.ollama_handler.generate_response(messages=messages)
+            response = self.ollama_handler.chat(messages=messages)
             logger.debug(f"RESEARCHER: Template creation prompt took {time.time() - start_time:.2f} seconds.")
-        
-        assert isinstance(response, ChatResponse) and \
-            type(response.response) == str, \
-                "Response is not of type ChatResponse with string content."
         
         task.template = response.response
         
@@ -144,12 +140,9 @@ class Thifany:
             ]
             start_time = time.time()
             logger.debug("RESEARCHER: Sending plan type decision prompt to Ollama.")
-            response = self.ollama_handler.generate_response(messages=messages)
+            response = self.ollama_handler.chat(messages=messages)
             logger.debug(f"RESEARCHER: Plan type decision prompt took {time.time() - start_time:.2f} seconds.")
             
-            assert isinstance(response, ChatResponse) and type(response.response) == str, \
-                "Response is not of type ChatResponse with string content."
-
             if (final_decision := self._extract_final_decision_regex(response.response)):
                 return PlanResponseModel(
                     reasoning=response.response,
@@ -164,12 +157,9 @@ class Thifany:
             reasoning = response.response
             status.update("RESEARCHER: Extracting final decision from reasoning.")
             start_time = time.time()
-            response = self.ollama_handler.generate_response(messages=messages)
+            response = self.ollama_handler.chat(messages=messages)
             logger.debug(f"RESEARCHER: Final decision extraction took {time.time() - start_time:.2f} seconds.")
             
-            assert isinstance(response, ChatResponse) and isinstance(response.response, str), \
-                "Response is not of type ChatResponse with string content."
-
             result_type = "subtasks" if "subtasks" in response.response.lower() else "solutions"
 
             return PlanResponseModel(reasoning=reasoning,result_type=result_type) #type: ignore
@@ -183,10 +173,8 @@ class Thifany:
             ]
             start_time = time.time()
             logger.debug("RESEARCHER: Sending subtask planning prompt to Ollama.")
-            cot_response = self.ollama_handler.generate_response(messages=messages_cot)
-            assert isinstance(cot_response, ChatResponse) and \
-                isinstance(cot_response.response, str), \
-                    "Response is not of type ChatResponse with string content."
+            cot_response = self.ollama_handler.chat(messages=messages_cot)
+            
             logger.debug(f"RESEARCHER: Subtask planning prompt took {time.time() - start_time:.2f} seconds.")
             
             messages_subtasks = [
@@ -197,15 +185,11 @@ class Thifany:
             status.update("RESEARCHER: Extracting subtasks from reasoning.")
             logger.debug("RESEARCHER: Sending subtask extraction prompt to Ollama.")
             start_time = time.time()
-            subtasks_response = self.ollama_handler.generate_response(
+            subtasks_response = self.ollama_handler.chat(
                 messages=messages_subtasks,
-                response_format=PlanSubtasks #type:ignore
+                response_format=PlanSubtasks
             )
             logger.debug(f"RESEARCHER: Subtask extraction prompt took {time.time() - start_time:.2f} seconds.")
-            
-            assert isinstance(subtasks_response, ChatResponse) and \
-                isinstance(subtasks_response.response, PlanSubtasks), \
-                    "Response is not of type PlanSubtasks."
 
             return subtasks_response.response
     
@@ -218,10 +202,7 @@ class Thifany:
 
             logger.debug("RESEARCHER: Sending solution planning prompt to Ollama.")
             start_time = time.time()
-            cot_response = self.ollama_handler.generate_response(messages=messages_cot)
-            assert isinstance(cot_response, ChatResponse) and \
-                isinstance(cot_response.response, str),\
-                    "Response is not of type ChatResponse with string content."
+            cot_response = self.ollama_handler.chat(messages=messages_cot)
 
             logger.debug(f"RESEARCHER: Solution planning prompt took {time.time() - start_time:.2f} seconds.")
             messages_solutions = [
@@ -231,16 +212,12 @@ class Thifany:
             status.update("RESEARCHER: Extracting solutions from reasoning.")
             logger.debug("RESEARCHER: Sending solution extraction prompt to Ollama.")
             start_time = time.time()
-            solutions_response = self.ollama_handler.generate_response(
+            solutions_response = self.ollama_handler.chat(
                 messages=messages_solutions,
                 response_format=PlanSolutions #type:ignore
             )
             logger.debug(f"RESEARCHER: Solution extraction prompt took {time.time() - start_time:.2f} seconds.")
-
-            assert isinstance(solutions_response, ChatResponse) and \
-                isinstance(solutions_response.response, PlanSolutions), \
-                    "Response is not of type PlanSolutions."
-
+            
             return solutions_response.response
     
     def _find_similar_tasks(self, base_task:BaseTask, top_k:int=3) -> str:
@@ -269,15 +246,12 @@ class Thifany:
             ]
             logger.debug("RESEARCHER: Sending task template creation prompt to Ollama.")
             start_time = time.time()
-            response = self.ollama_handler.generate_response(
+            
+            response = self.ollama_handler.chat(
                 messages=messages,
                 response_format=DefineTaskResponse #type:ignore
             )
             logger.debug(f"RESEARCHER: Task template creation prompt took {time.time() - start_time:.2f} seconds.")
-            
-            assert isinstance(response, ChatResponse) and \
-                isinstance(response.response, DefineTaskResponse), \
-                    "Response is not of type DefineTaskResponse."
 
             return response.response
     

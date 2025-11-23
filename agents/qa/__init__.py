@@ -7,7 +7,7 @@ from typing import Tuple, Optional
 from schemas.tests import TestSuiteComplete, TestSuite, TestsResult, TestCase, TestSuiteBase
 from schemas.task import BaseTask
 
-from modules.ollama import OllamaHandler, ChatResponse
+from modules.llm import OllamaHandler, ChatResponse
 from modules.logger import get_logger, StatusContext
 
 from agents.generator_code import GeneratorCodeBaseModel
@@ -90,8 +90,7 @@ class Carlos(GeneratorCodeBaseModel):
                 )
             }
         ]
-        response = self.ollama_handler.generate_response(messages=messages)
-        assert isinstance(response, ChatResponse) and isinstance(response.response, str)
+        response = self.ollama_handler.chat(messages=messages)
         return response.response
     
     def _step_extraction(self, reasoning_text: str) -> Tuple[TestSuiteBase, str]:
@@ -107,13 +106,11 @@ class Carlos(GeneratorCodeBaseModel):
             {"role": "user", "content": reasoning_text}
         ]
         
-        response = self.ollama_handler.generate_response(
+        response = self.ollama_handler.chat(
             messages=messages,
-            response_format=TestSuiteBase # type: ignore
+            response_format=TestSuiteBase
         )
-        
-        assert isinstance(response, ChatResponse) and isinstance(response.response, TestSuiteBase)
-        
+                
         return response.response, code
 
     def _extract_full_suite(self, reasoning_text: str) -> Tuple[TestSuiteBase, str]:
@@ -125,15 +122,12 @@ class Carlos(GeneratorCodeBaseModel):
             
             logger.debug("QA: Sending extraction full suite prompt to Ollama.")
             start_time = time.time()
-            response = self.ollama_handler.generate_response(
+            response = self.ollama_handler.chat(
                 messages=messages,
-                response_format=TestSuite # type: ignore
+                response_format=TestSuite
             )
 
             logger.debug(f"QA: Extraction full suite prompt took {time.time() - start_time:.2f} seconds.")
-
-            assert isinstance(response, ChatResponse) and isinstance(response.response, TestSuite)
-
             return response.response, response.response.test_code_raw
     
     def _repair_code_loop(
@@ -167,8 +161,7 @@ class Carlos(GeneratorCodeBaseModel):
                     {"role": "user", "content": user_content}
                 ]
 
-                fix_response = self.ollama_handler.generate_response(messages=messages)
-                assert isinstance(fix_response, ChatResponse) and isinstance(fix_response.response, str)
+                fix_response = self.ollama_handler.chat(messages=messages)
 
                 cleaned_fix = self.clean_code(fix_response.response)
                 current_code = cleaned_fix if cleaned_fix else fix_response.response

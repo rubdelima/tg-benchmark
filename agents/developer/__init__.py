@@ -3,7 +3,7 @@ from typing import List, Dict
 import time
 
 # Modules
-from modules.ollama import OllamaHandler, ChatResponse
+from modules.llm import OllamaHandler, ChatResponse
 from modules.dataloader import QuestionDataset
 from modules.logger import get_logger, StatusContext
 from agents.generator_code import GeneratorCodeBaseModel, CheckResult
@@ -78,9 +78,9 @@ class Ellian(GeneratorCodeBaseModel):
                 logger.debug(f"Developer: Generation attempt {attempt} / {self.generation_retry_attempts}")
                 status.update(f"Developer: Generating code for solution ({attempt}/{self.generation_retry_attempts})")
                 start_time = time.time()
-                response = self.ollama_handler.generate_response(messages=messages)
+                response = self.ollama_handler.chat(messages=messages)
                 elapsed_time = time.time() - start_time
-                assert isinstance(response, ChatResponse) and isinstance(response.response, str)
+                
                 logger.debug(f"Developer: Response generation took {elapsed_time:.2f} seconds. With {response.output_tokens} output tokens.")
                 
 

@@ -5,7 +5,7 @@ from typing import Tuple
 
 from pydantic import BaseModel
 
-from modules.ollama import OllamaHandler, ChatResponse
+from modules.llm import OllamaHandler, ChatResponse
 from modules.logger import get_logger, StatusContext
 
 from schemas.solution import Solution, BaseSolution
@@ -41,10 +41,9 @@ class Will:
         logger.info("Judge: Judging the proposed solution.")
         start_time = time.time()
         with StatusContext("Judge: Judging the proposed solution") as status:
-            response = self.ollama_handler.generate_response(messages=messages)
+            response = self.ollama_handler.chat(messages=messages)
         logger.debug(f"Judge: Judgment response generation took {time.time() - start_time:.2f} seconds.")
         
-        assert isinstance(response, ChatResponse) and type(response.response) == str, "Unexpected response type from OllamaHandler"
         
         analysis = self._parse_judgment_response(response.response)
         
@@ -64,10 +63,9 @@ class Will:
         start_time = time.time()
         
         with StatusContext("Judge: Judging the generated code solution") as status:
-            response = self.ollama_handler.generate_response(messages=messages)
+            response = self.ollama_handler.chat(messages=messages)
         logger.debug(f"Judge: Judgment response generation took {time.time() - start_time:.2f} seconds.")
         
-        assert isinstance(response, ChatResponse) and type(response.response) == str, "Unexpected response type from OllamaHandler"
         analysis = self._parse_judgment_response(response.response)
         
         logger.info(f"Judge: Code judged as {'correct' if analysis.is_correct else 'incorrect'}.")
@@ -92,10 +90,8 @@ class Will:
         logger.info("Judge: Analyzing test failures to refine the solution.")
         start_time = time.time()
         with StatusContext("Judge: Analyzing test failures to refine the solution") as status:
-            response = self.ollama_handler.generate_response(messages=messages)
+            response = self.ollama_handler.chat(messages=messages)
         logger.debug(f"Judge: Analyze test failures response generation took {time.time() - start_time:.2f} seconds.")
-        
-        assert isinstance(response, ChatResponse) and type(response.response) == str, "Unexpected response type from OllamaHandler"
         
         solution_update = self._parse_analyze_test_failures(response.response)
         
@@ -124,12 +120,11 @@ class Will:
         ]
         
         with StatusContext("Judge: Extracting judgment feedback") as status:
-            extraction_response = self.ollama_handler.generate_response(
+            extraction_response = self.ollama_handler.chat(
                 messages=messages,
-                response_format=Judgment # type:ignore
+                response_format=Judgment
             )
         
-        assert isinstance(extraction_response, ChatResponse) and isinstance(extraction_response.response, Judgment), "Unexpected response type from OllamaHandler"
         logger.debug("Judge: Successfully extracted judgment feedback.")
         return extraction_response.response
         
@@ -151,11 +146,10 @@ class Will:
         ]
         
         with StatusContext("Judge: Extracting solution from analyze test failures response") as status:
-            extraction_response = self.ollama_handler.generate_response(
+            extraction_response = self.ollama_handler.chat(
                 messages=messages,
-                response_format=BaseSolution # type:ignore
+                response_format=BaseSolution
             )
         
-        assert isinstance(extraction_response, ChatResponse) and isinstance(extraction_response.response, BaseSolution), "Unexpected response type from OllamaHandler"
         return extraction_response.response
         

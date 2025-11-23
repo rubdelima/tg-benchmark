@@ -12,7 +12,7 @@ from schemas.task import Task, BaseTask
 from schemas.solution import Solution, BaseSolution
 from schemas.tests import TestSuiteComplete
 from schemas.plan import PlanResponse
-from modules.ollama import OllamaHandler
+from modules.llm import OllamaHandler
 from modules.dataloader import QuestionDataset
 
 
