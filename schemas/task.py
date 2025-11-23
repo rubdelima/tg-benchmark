@@ -1,6 +1,6 @@
 from typing import List, Optional
 from pydantic import BaseModel, Field
-from modules.schemas.tests import TestSuiteComplete
+from schemas.tests import TestSuiteComplete
 
 class FunctionArgs(BaseModel):
     name: str = Field(..., description="Name of the function argument")

@@ -2,16 +2,16 @@ from typing import List
 
 from pydantic import BaseModel, Field
 
-from modules.agents.developer import Ellian
-from modules.agents.judge import Will
-from modules.agents.qa import Carlos
-from modules.agents.reseacher import Thifany
+from agents.developer import Ellian
+from agents.judge import Will
+from agents.qa import Carlos
+from agents.reseacher import Thifany
 
 from modules.buffer import VectorBuffer
-from modules.schemas.task import Task, BaseTask
-from modules.schemas.solution import Solution, BaseSolution
-from modules.schemas.tests import TestSuiteComplete
-from modules.schemas.plan import PlanResponse
+from schemas.task import Task, BaseTask
+from schemas.solution import Solution, BaseSolution
+from schemas.tests import TestSuiteComplete
+from schemas.plan import PlanResponse
 from modules.ollama import OllamaHandler
 from modules.dataloader import QuestionDataset
 

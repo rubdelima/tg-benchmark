@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from pathlib import Path
 import random
 import json
-from modules.schemas.tests import TestCase
+from schemas.tests import TestCase
 
 class QuestionDatasetBase(BaseModel):
     question_id : str

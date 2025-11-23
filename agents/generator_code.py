@@ -1,12 +1,10 @@
 from dataclasses import dataclass
 import ast
-from typing import Union, Literal, List, Optional
+from typing import List, Optional
 from pathlib import Path
 from mypy import api
 import re
 from tempfile import NamedTemporaryFile
-
-from modules.ollama import OllamaHandler
 
 CODE_BLOCK_PATTERN = re.compile(r"```(?:python|py)?\s*(.*?)\s*```", re.DOTALL | re.IGNORECASE)
 ERROR_RE = re.compile(r'^(?P<file>.+?):(?P<line>\d+): error: (?P<msg>.+?)(?: \[(?P<code>[^\]]+)\])?$')

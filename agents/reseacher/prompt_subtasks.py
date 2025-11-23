@@ -1,4 +1,4 @@
-from modules.agents.reseacher.prompt_plan import user_task_input
+from agents.reseacher.prompt_plan import user_task_input
 
 system_generate_subtasks_prompt = """
 You are an expert agent specializing in decomposing complex tasks into a clear, justified sequence of subtasks.

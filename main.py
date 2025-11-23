@@ -1,31 +1,34 @@
-from modules.models import Problem
-from modules.buffer import VectorBuffer
-import time
-from rich import print
+from modules.dataloader import Dataloader
+from modules.test_runner import TestRunner
+from schemas.tests import TestSuiteBase
+from modules.ollama import OllamaHandler
+from agents import *
+from modules.logger import get_logger
 
-if __name__ == "__main__":
-    from dataclasses import asdict
+logger = get_logger(__name__)
+test_runner = TestRunner()
 
-    p1 = Problem(
-        status="completed",
-        definition="Reverse a list of strings.",
-        keywords=["reverse", "list", "strings"],
-        dod="Return a list with the order and content of each string reversed."
-    )
-    vb = VectorBuffer()
-    idx1 = vb.create(p1)
+data = Dataloader.load_jsonl("data/dataset.jsonl")
+example = data["1873_A"]
+test_suite = TestSuiteBase(test_cases=example.private_test_cases)
 
-    # Consultando por similaridade
-    query_p = Problem(
-        status="running",
-        definition="Invert a list and invert each string in it.",
-        keywords=["invert", "reverse", "list", "strings"],
-        dod="Output list should have reversed order and each string reversed."
-    )
-    start_time = time.time()
-    results = vb.semantic_search(query_p)
-    end_time = time.time()
-    print(f"Foram encontrados {len(results)} problemas similares em {end_time - start_time:.4f} segundos:")
-    for r in results:
-        
-        print(r.model_dump)
+ollama_handler = OllamaHandler(model_name="qwen3:0.6b")
+dev = Ellian(ollama_handler)
+qa = Carlos(ollama_handler)
+reseacher = Thifany(ollama_handler)
+judge = Will(ollama_handler)
+
+code = dev.generate_code_from_question_dataset(example)
+results = test_runner.run(test_suite, code)
+
+logger.info("Test Results:")
+print("\nTest Results:")
+print(f"Total Time: {results.total_time}")
+print(f"Accuracy: {results.success_rate:2.1%} ({results.passed_tests}/{results.total_tests})")
+if results.errors:
+    print("Errors:")
+    for error in results.errors:
+        print("Expected:\n", error.expected_output)
+        print("Got:\n", error.actual_output)
+        print("Error Message:\n", error.error_message)
+        print("-----")

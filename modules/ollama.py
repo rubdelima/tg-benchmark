@@ -3,7 +3,7 @@ import ollama
 import subprocess
 from rich import print
 from pydantic import BaseModel
-from typing import List, Dict, Union, Literal, Optional, Generator, Any
+from typing import Dict, Union, Literal, Optional, Generator, Any
 import time
 from tqdm.auto import tqdm
 import json

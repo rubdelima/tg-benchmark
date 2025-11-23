@@ -5,9 +5,10 @@ import tempfile
 import subprocess
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Tuple, Optional, List
+from modules.logger import StatusContext
 
 # Ajuste os imports conforme a estrutura exata do seu projeto
-from modules.schemas.tests import TestSuiteBase, TestsResult, ErrorDetail, TestCase
+from schemas.tests import TestSuiteBase, TestsResult, ErrorDetail, TestCase
 
 class TestRunner:
     """
@@ -46,22 +47,38 @@ class TestRunner:
             tmp_file.write(full_code)
 
         try:
-            # Execução Paralela
-            with ThreadPoolExecutor(max_workers=min(self.max_workers, total_tests)) as executor:
-                future_to_case = {
-                    executor.submit(self._execute_single_case, tmp_file_path, case): case 
-                    for case in test_suite.test_cases
-                }
 
-                for future in as_completed(future_to_case):
-                    success, error_detail, exec_time = future.result()
-                    total_time += exec_time
-                    
-                    if success:
-                        passed_tests += 1
-                    else:
-                        if error_detail:
-                            errors.append(error_detail)
+            total_tests = len(test_suite.test_cases)
+            completed_tests = 0
+
+            # 1. Inicia o Contexto de Status
+            with StatusContext(f"Run tests (0/{total_tests})...") as status:
+
+                with ThreadPoolExecutor(max_workers=min(self.max_workers, total_tests)) as executor:
+                    future_to_case = {
+                        executor.submit(self._execute_single_case, tmp_file_path, case): case 
+                        for case in test_suite.test_cases
+                    }
+
+                    for future in as_completed(future_to_case):
+                        success, error_detail, exec_time = future.result()
+                        total_time += exec_time
+
+                        # Atualiza contadores de lógica
+                        completed_tests += 1
+                        if success:
+                            passed_tests += 1
+                        else:
+                            if error_detail:
+                                errors.append(error_detail)
+
+                        # 2. ATUALIZA A UI AQUI
+                        # Mostra o progresso e quantos passaram/falharam em tempo real
+                        failed_tests = len(errors)
+                        status.update(
+                            f"Run tests ({completed_tests}/{total_tests}) "
+                            f"| ✅ {passed_tests} | ❌ {failed_tests}"
+                        )
 
         finally:
             # Garante a remoção do arquivo temporário mesmo se houver crash

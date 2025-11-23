@@ -1,4 +1,4 @@
-from modules.agents.reseacher.prompt_plan import user_task_input
+from agents.reseacher.prompt_plan import user_task_input
 
 system_generate_solutions_prompt = """
 You are an expert agent specializing in planning approaches to fully solve programming tasks.
