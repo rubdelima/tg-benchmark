@@ -6,9 +6,11 @@ from modules.agents.generator_code import GeneratorCodeBaseModel, CheckResult
 
 from modules.schemas.task import Task
 from modules.schemas.solution import Solution
+from modules.dataloader import QuestionDataset
 
 from .prompts_dev_verbosity import get_verbosity_prompt
 from .pompts_join_tasks import join_tasks, system_join_tasks_prompt
+from .prompts_direct import system_direct_solve_prompt, user_direct_solve_template, test_cases_template
 
 class DeveloperGenerationError(Exception):
     def __init__(self, text, *args, messages: list[dict]):
@@ -68,6 +70,32 @@ class Ellian(GeneratorCodeBaseModel):
         
         raise DeveloperGenerationError("Failed to join subtasks code into a valid Python code after multiple attempts.", messages=messages)
         
+    def generate_code_from_question_dataset(self, question_dataset: QuestionDataset):
+        test_cases_str = "\n".join(
+            test_cases_template.format(index=i+1, input=tc.inputs, output=tc.expected_output)
+            for i, tc in enumerate(question_dataset.public_test_cases)
+        )
+        messages = [
+            {"role": "system", "content": system_direct_solve_prompt},
+            {"role": "user", "content": user_direct_solve_template.format(
+                title=question_dataset.title,
+                description=question_dataset.content,
+                test_cases=test_cases_str
+            )}
+        ]
+        
+        for _ in range(self.generation_retry_attempts):
+            response = self.ollama_handler.generate_response(messages=messages)
+            assert isinstance(response, ChatResponse) and isinstance(response.response, str)
+            
+            parse_code_result = self.parse_code(response.response, ignore_warnings=self.ignore_warnings)
+            
+            if parse_code_result.success:
+                return parse_code_result.code
+            
+            messages.extend(self.get_retry_messages(parse_code_result, response))
+        
+        raise DeveloperGenerationError("Failed to generate valid Python code from question dataset after multiple attempts.", messages=messages)
     
     @staticmethod
     def _extract_solution_messages(solution: Solution) -> list[dict]:

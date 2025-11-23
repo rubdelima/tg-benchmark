@@ -1,8 +1,8 @@
 # Python stdlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import json
 import re
-from typing import Literal, Optional
+from typing import Literal, Optional, List
 
 # Modules
 from modules.buffer import VectorBuffer
@@ -10,19 +10,20 @@ from modules.ollama import OllamaHandler, ChatResponse
 
 # Schemas
 from modules.schemas.plan import PlanResponseModel, PlanResponse, PlanSubtasks, PlanSolutions
-from modules.schemas.task import BaseTask, Task
-from modules.schemas.tests import TestSuite
+from modules.schemas.task import BaseTask, Task, DefineTaskResponse
+from modules.schemas.tests import TestSuite, TestSuiteComplete, TestCase as TestCaseSchema
+from modules.dataloader import QuestionDataset, TestCase
 
 # Prompts
 from modules.agents.reseacher.prompt_plan import decide_plan_system_prompt, user_prompt_template_decide, user_prompt_template_base, plan_type_extract_prompt
 from modules.agents.reseacher.prompt_subtasks import system_generate_subtasks_prompt, system_extract_subtasks_prompt
 from modules.agents.reseacher.prompt_solutions import system_generate_solutions_prompt, system_extract_solutions_prompt, create_template_prompt
-
+from modules.agents.reseacher.prompt_question import system_extract_task_prompt, user_extract_task_template, base_code
 
 @dataclass
 class Thifany:
     ollama_handler: OllamaHandler
-    vector_buffer: VectorBuffer
+    vector_buffer: VectorBuffer = field(default_factory=lambda: VectorBuffer())
     
     # PUBLIC FUNCTIONS
     
@@ -93,6 +94,21 @@ class Thifany:
         self.vector_buffer.create(task)
         return response.response
     
+    def define_task(self, question_dataset: QuestionDataset) -> Task:
+        task_template = self._create_task_template(question_dataset)
+        return Task(
+            definition=task_template.definition,
+            dod=task_template.dod,
+            keywords=task_template.keywords,
+            function_name="main",
+            args=[],
+            test_suite=self._create_test_suite(question_dataset.public_test_cases),
+            template="",
+            best_solution="",
+            best_solution_rating=0.0,
+            code=""
+        )
+        
     # PRIVATE FUNCTIONS
     
     @staticmethod
@@ -156,7 +172,7 @@ class Thifany:
         
         subtasks_response = self.ollama_handler.generate_response(
             messages=messages_subtasks,
-            type=PlanSubtasks #type:ignore
+            response_format=PlanSubtasks #type:ignore
         )
         
         assert isinstance(subtasks_response, ChatResponse) and \
@@ -183,7 +199,7 @@ class Thifany:
         
         solutions_response = self.ollama_handler.generate_response(
             messages=messages_solutions,
-            type=PlanSolutions #type:ignore
+            response_format=PlanSolutions #type:ignore
         )
         
         assert isinstance(solutions_response, ChatResponse) and \
@@ -206,3 +222,40 @@ class Thifany:
             context += f"- Resolution Template: {task.template}\n\n"
         
         return context
+    
+    def _create_task_template(self, question_dataset: QuestionDataset) -> DefineTaskResponse:
+        messages = [
+            {"role": "system", "content": system_extract_task_prompt},
+            {"role": "user", "content": user_extract_task_template.format(
+                title=question_dataset.title,
+                content=question_dataset.content
+            )}
+        ]
+        
+        response = self.ollama_handler.generate_response(
+            messages=messages,
+            response_format=DefineTaskResponse #type:ignore
+        )
+        
+        assert isinstance(response, ChatResponse) and \
+            isinstance(response.response, DefineTaskResponse), \
+                "Response is not of type DefineTaskResponse."
+        
+        return response.response
+    
+    def _create_test_suite(self, tests_cases : List[TestCase]) -> TestSuiteComplete:
+        tests_cases_formatted = []
+        
+        for test_case in tests_cases:
+            tests_cases_formatted.append(
+                TestCaseSchema(
+                    inputs=test_case.inputs,
+                    expected_output=test_case.expected_output
+                )
+            )
+        
+        return TestSuiteComplete(
+            function_name="main",
+            test_cases=tests_cases_formatted,
+            test_code_raw=base_code
+        )

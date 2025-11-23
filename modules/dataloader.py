@@ -1,5 +1,9 @@
+from typing import List
 from pydantic import BaseModel
 from pathlib import Path
+import random
+import json
+from modules.schemas.tests import TestCase
 
 class QuestionDatasetBase(BaseModel):
     question_id : str
@@ -7,31 +11,37 @@ class QuestionDatasetBase(BaseModel):
     title : str
     content : str
 
-class TestCase(BaseModel):
-    input : str
-    output : str
-
 class QuestionDataset(QuestionDatasetBase):
-    public_test_cases : list[TestCase] = []
-    private_test_cases : list[TestCase] = []
+    public_test_cases : List[TestCase] = []
+    private_test_cases : List[TestCase] = []
 
 class Dataloader:
-    def __init__(self, dataset: list[QuestionDatasetBase]):
-        self.dataset = dataset
+    def __init__(self, dataset: List[QuestionDatasetBase]):
+        self.dataset_list = dataset
+        self.dataset_dict = {item.question_id: item for item in dataset}
     
     def __len__(self):
-        return len(self.dataset)
+        return len(self.dataset_list)
     
-    def __getitem__(self, idx:int)->QuestionDataset:
+    def __getitem__(self, idx:int|str)->QuestionDataset:
+        target = self.dataset_list if type(idx) == int else self.dataset_dict
+        item = target[idx] # type: ignore
         return QuestionDataset(
-            **self.dataset[idx].model_dump(),
-            public_test_cases = self._get_test_cases(self.dataset[idx].question_id, "public"),
-            private_test_cases = self._get_test_cases(self.dataset[idx].question_id, "private")
+            **item.model_dump(),
+            public_test_cases = self._get_test_cases(item.question_id, "public"),
+            private_test_cases = self._get_test_cases(item.question_id, "private")
         )
     
     def __iter__(self):
-        for item in self.dataset:
+        for item in self.dataset_list:
             yield item
+    
+    @classmethod
+    def load_jsonl(cls, filepath:str)->'Dataloader':
+        with open(filepath, "r", encoding="utf-8") as f:
+            dataset_lines = [json.loads(line) for line in f]
+        dataset = [QuestionDatasetBase(**line) for line in dataset_lines]
+        return cls(dataset)
     
     def _get_test_cases(self, question_id:str, test_type:str)->list[TestCase]:
         dir_path = Path(f"./data/{question_id}/{test_type}")
@@ -47,11 +57,25 @@ class Dataloader:
                 break
             with open(input_path, "r") as infile, open(output_path, "r") as outfile:
                 test_case = TestCase(
-                    input=infile.read(),
-                    output=outfile.read()
+                    inputs=infile.read(),
+                    expected_output=outfile.read()
                 )
                 test_cases.append(test_case)
             idx += 1
         return test_cases
     
+def load_dataloader(easy:int, medium:int, hard:int, random_seed:int=42)->Dataloader:
+    with open("./data/dataset.jsonl", "r", encoding="utf-8") as f:
+        dataset_lines = [json.loads(line) for line in f]
     
+    random.seed(random_seed)
+    easy_questions = [line for line in dataset_lines if line['difficulty'] == 'easy']
+    medium_questions = [line for line in dataset_lines if line['difficulty'] == 'medium']
+    hard_questions = [line for line in dataset_lines if line['difficulty'] == 'hard']
+    
+    selected_questions = random.sample(easy_questions, min(easy, len(easy_questions))) + \
+                         random.sample(medium_questions, min(medium, len(medium_questions))) + \
+                         random.sample(hard_questions, min(hard, len(hard_questions)))
+    random.shuffle(selected_questions)
+    dataset = [QuestionDatasetBase(**question) for question in selected_questions]
+    return Dataloader(dataset)

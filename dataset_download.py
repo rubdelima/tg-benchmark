@@ -1,9 +1,8 @@
-from datasets import load_dataset
+from datasets import load_dataset #type: ignore
 from tqdm.auto import tqdm #type: ignore
 from pathlib import Path
 from modules.dataloader import QuestionDatasetBase
 import json
-
 
 def save_test_cases(test_cases_str:str, test_type:str, question_id:str):
     test_cases :dict = json.loads(test_cases_str)
@@ -33,6 +32,6 @@ for line in tqdm(ds, total=290):
     dataset_line = create_dataset_line(line)
     dataset_lines.append(dataset_line.model_dump())
 
-with open("dataset.jsonl", "w") as f:
+with open(".data/dataset.jsonl", "w", encoding="utf-8") as f:
     for data_line in dataset_lines:
         f.write(json.dumps(data_line) + "\n")

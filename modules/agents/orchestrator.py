@@ -13,6 +13,7 @@ from modules.schemas.solution import Solution, BaseSolution
 from modules.schemas.tests import TestSuiteComplete
 from modules.schemas.plan import PlanResponse
 from modules.ollama import OllamaHandler
+from modules.dataloader import QuestionDataset
 
 
 class OrchestratorConfig(BaseModel):
@@ -55,16 +56,30 @@ class Vivi:
             ollama_handler=self.ollama_handler, retry_attempts=self.max_retry)
         self.researcher = Thifany(
             ollama_handler=self.ollama_handler, vector_buffer=VectorBuffer())
-
+    
+    def solve_question_dataset(self, question_dataset: QuestionDataset) -> str:
+        # Passo 1 -> Monar uma Task com Base no QuestionDataset
+        task = self.researcher.define_task(question_dataset)
+        # Passo 2 -> Iniciar a resolução da Task
+        task = self.solve_task(task, self.max_iter)
+        # Passo 3 -> Retornar o código final da Task resolvida
+        return task.code
+    
+    def generate_code(self, question_dataset: QuestionDataset) -> str:
+        return self.dev.generate_code_from_question_dataset(question_dataset)
+    
     def solve_base_task(self, base_task: BaseTask, iteration: int) -> Task:
         # O Primeiro passo é o QA Criar casos de teste para a task
         task_test_suite = self.qa.create_tests_suite(base_task)
 
         task = Task(test_suite=task_test_suite, **base_task.model_dump())
+        
+        return self.solve_task(task, iteration)
 
+    def solve_task(self, task: Task, iteration: int) -> Task:
         # Depois vamos para a abordagem de resolver a task, se será ramificar [subtasks] ou uma abordagem de partir para as soluções
         solve_task_plan = self.researcher.plan(
-            base_task, task_test_suite, iteration <= self.max_iter, self.use_buffer)
+            task, task.test_suite, iteration <= self.max_iter, self.use_buffer)
 
         # Caso a abordagem sugerida seja de subtasks, vamos resolver cada subtask recursivamente
         assert ((solve_task_plan.solutions is None) ^ (solve_task_plan.subtasks is None)), \

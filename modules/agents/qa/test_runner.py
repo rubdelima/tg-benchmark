@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Tuple, Optional, List
 
 # Ajuste os imports conforme a estrutura exata do seu projeto
-from modules.schemas.tests import TestSuiteComplete, TestsResult, ErrorDetail, TestCase
+from modules.schemas.tests import TestSuiteBase, TestsResult, ErrorDetail, TestCase
 
 class TestRunner:
     """
@@ -18,7 +18,7 @@ class TestRunner:
     def __init__(self, max_workers: int = 8):
         self.max_workers = max_workers
 
-    def run(self, test_suite: TestSuiteComplete, full_code: str) -> TestsResult:
+    def run(self, test_suite: TestSuiteBase, full_code: str) -> TestsResult:
         """
         Executa a suíte de testes contra o código fornecido (já com a função implementada).
         """

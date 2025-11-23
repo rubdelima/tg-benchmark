@@ -14,12 +14,14 @@ class FunctionArgs(BaseModel):
             f"{'\t' * (num_tabs + 1)}DESCRIPTION: {self.description}"
         )
 
-class BaseTask(BaseModel):
+class DefineTaskResponse(BaseModel):
     definition: str = Field(..., description="Definition of the task")
-    function_name : str = Field(..., description="Name of the function to be implemented")
-    args: List[FunctionArgs] = Field([], description="List of function arguments")
     dod: str = Field(..., description="Definition of Done for the task")
     keywords: List[str] = Field([], description="List of keywords associated with the task")
+
+class BaseTask(DefineTaskResponse):
+    function_name : str = Field(..., description="Name of the function to be implemented")
+    args: List[FunctionArgs] = Field([], description="List of function arguments")
 
 class Task(BaseTask):
     test_suite: TestSuiteComplete = Field(..., description="Test suite associated with the task")
