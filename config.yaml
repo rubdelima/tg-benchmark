@@ -1,3 +1,10 @@
 logging:
   level: DEBUG
   logs_path: ./logs/
+
+database:
+  data_path: ./data/
+  dataset_file: ./data/dataset.jsonl
+
+terminal:
+  hide_ollama: false

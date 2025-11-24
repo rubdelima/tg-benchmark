@@ -12,23 +12,18 @@ data = Dataloader.load_jsonl("data/dataset.jsonl")
 example = data["1873_A"]
 test_suite = TestSuiteBase(test_cases=example.private_test_cases)
 
-ollama_handler = OllamaHandler(model_name="phi4-mini-reasoning:3.8b")
-dev = Ellian(ollama_handler)
-qa = Carlos(ollama_handler)
-reseacher = Thifany(ollama_handler)
-judge = Will(ollama_handler)
+from agents.orchestrator import Vivi, OrchestratorConfig
 
-code = dev.generate_code_from_question_dataset(example)
-results = test_runner.run(test_suite, code)
+config = OrchestratorConfig(
+    model="qwen2.5-coder:1.5b",
+    max_iter=2,
+    max_retry=2,
+    dev_verbosity=1,
+    judge_level=0,
+    use_buffer=False,
+    ignore_warnings=True
+)
 
-logger.info("Test Results:")
-print("\nTest Results:")
-print(f"Total Time: {results.total_time}")
-print(f"Accuracy: {results.success_rate:2.1%} ({results.passed_tests}/{results.total_tests})")
-if results.errors:
-    print("Errors:")
-    for error in results.errors:
-        print("Expected:\n", error.expected_output)
-        print("Got:\n", error.actual_output)
-        print("Error Message:\n", error.error_message)
-        print("-----")
+orchestrator = Vivi(config)
+
+code_arch = orchestrator.solve_question_dataset(example)

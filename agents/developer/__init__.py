@@ -13,7 +13,7 @@ from schemas.task import Task
 from schemas.solution import Solution
 
 # Prompts
-from .prompts_dev_verbosity import get_verbosity_prompt
+from .prompts_dev_verbosity import get_verbosity_prompt, user_prompt_example
 from .pompts_join_tasks import join_tasks, system_join_tasks_prompt
 from .prompts_direct import system_direct_solve_prompt, user_direct_solve_template, test_cases_template
 
@@ -43,6 +43,7 @@ class Ellian(GeneratorCodeBaseModel):
             {"role": "system", "content": get_verbosity_prompt(self.verbosity)},
             *self._extract_solution_messages(solution)
         ]
+        logger.debug(f"Developer: Solution history messages: {messages}")
         generated_code = self._generation_loop(messages)
         solution.solution_history.append({"role": "developer","content": generated_code})
         return solution
@@ -104,6 +105,14 @@ class Ellian(GeneratorCodeBaseModel):
                 "role" : "assistant" if history_entry['role'] == "developer" else "user",
                 "content" : history_entry['content']
             })
+        messages.append({
+            "role": "user",
+            "content": user_prompt_example.format(
+                function_name=solution.function_name,
+                args="\n".join([arg.show(num_tabs=1) for arg in solution.args]),
+                steps=solution.propose_solution
+            )
+        })
         return messages
     
     def get_retry_messages(self, parse_code_result:CheckResult, response: ChatResponse)-> List[Dict]:

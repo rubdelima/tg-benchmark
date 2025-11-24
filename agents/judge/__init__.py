@@ -81,7 +81,7 @@ class Will:
             {"role" : "user", "content": analyze_test_failures_user_template.format(
                 solution_context=solution.context,
                 propose_solution=solution.propose_solution,
-                test_code=tests_results.raw_code,
+                code=tests_results.raw_code,
                 test_suite_summary=test_suite.test_cases_summary(no_code=True),
                 tests_report=tests_results.display_errors()
             )}

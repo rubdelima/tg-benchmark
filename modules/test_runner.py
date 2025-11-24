@@ -5,7 +5,9 @@ import tempfile
 import subprocess
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Tuple, Optional, List
-from modules.logger import StatusContext
+from modules.logger import StatusContext, get_logger 
+
+logger = get_logger(__name__)
 
 # Ajuste os imports conforme a estrutura exata do seu projeto
 from schemas.tests import TestSuiteBase, TestsResult, ErrorDetail, TestCase
@@ -132,6 +134,11 @@ class TestRunner:
             # Normaliza quebras de linha (Windows \r\n -> Unix \n) e remove espaços das pontas
             actual_output = result.stdout.strip().replace('\r\n', '\n')
             expected_output_norm = expected_data.strip().replace('\r\n', '\n')
+            
+            logger.debug(f"Return code: {result.returncode}")
+            logger.debug(f"Normalized actual output:\n{actual_output}")
+            logger.debug(f"Normalized expected output:\n{expected_output_norm}")
+            logger.debug(f"Response OK: {actual_output == expected_output_norm}")
             
             # 1. Verifica Erros de Runtime (Crash, EOFError, SyntaxError que passou batido)
             if result.returncode != 0:

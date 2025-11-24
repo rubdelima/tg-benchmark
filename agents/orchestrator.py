@@ -112,6 +112,8 @@ class Vivi:
         # Vamos transformar a Task em Uma solução para fazer o loop de ajustes
         
         solution = Solution(
+            function_name=task.function_name,
+            args=task.args,
             context=task.definition,
             propose_solution=skeleton,
             best_code=task.code,

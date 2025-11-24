@@ -20,7 +20,8 @@ from modules.dataloader import QuestionDataset
 from agents.reseacher.prompt_plan import decide_plan_system_prompt, user_prompt_template_decide, user_prompt_template_base, plan_type_extract_prompt
 from agents.reseacher.prompt_subtasks import system_generate_subtasks_prompt, system_extract_subtasks_prompt
 from agents.reseacher.prompt_solutions import system_generate_solutions_prompt, system_extract_solutions_prompt, create_template_prompt
-from agents.reseacher.prompt_question import system_extract_task_prompt, user_extract_task_template, base_code
+from agents.reseacher.prompt_question import system_extract_task_prompt, user_extract_task_template, base_code, system_extract_task_json_prompt
+from agents.utils import extract_json
 
 logger = get_logger(__name__)
 
@@ -244,16 +245,26 @@ class Thifany:
                     content=question_dataset.content
                 )}
             ]
+            
             logger.debug("RESEARCHER: Sending task template creation prompt to Ollama.")
             start_time = time.time()
             
-            response = self.ollama_handler.chat(
-                messages=messages,
-                response_format=DefineTaskResponse #type:ignore
-            )
+            response = self.ollama_handler.chat(messages=messages)
+            extracted_json = extract_json(response.response)
+            if not extracted_json:
+                logger.warning("RESEARCHER: Failed to extract JSON from task template response. Running model extract fallback.")
+                messages_fallback = [
+                    {"role": "system", "content": system_extract_task_json_prompt},
+                    {"role": "user", "content": response.response}
+                ]
+                response_dict = self.ollama_handler.chat(messages=messages_fallback, response_format=dict)
+                extracted_json = response_dict.response
+            
+            response_model = DefineTaskResponse(**extracted_json) 
+            
             logger.debug(f"RESEARCHER: Task template creation prompt took {time.time() - start_time:.2f} seconds.")
 
-            return response.response
+            return response_model
     
     def _create_test_suite(self, tests_cases : List[TestCase]) -> TestSuiteComplete:
         tests_cases_formatted = []
