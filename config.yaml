@@ -1,10 +1,61 @@
+# =============================================================================
+# TG-Benchmark Configuration
+# =============================================================================
+
 logging:
-  level: DEBUG
+  level: INFO
   logs_path: ./logs/
 
-database:
-  data_path: ./data/
+paths:
+  data: ./data/
   dataset_file: ./data/dataset.jsonl
+  results: ./results/
+  checkpoints: ./.checkpoints/
+  tui_state: ./.tui_state/
+
+# =============================================================================
+# Dataset Configuration (Quantidade de questões por dificuldade)
+# =============================================================================
+
+dataset:
+  easy_samples: 30
+  medium_samples: 30
+  hard_samples: 30
 
 terminal:
   hide_ollama: false
+
+# =============================================================================
+# Benchmark Configuration (Modelos e Arquiteturas)
+# =============================================================================
+
+benchmark:
+  # Arquiteturas a serem testadas
+  architectures:
+    - "simple"
+    - "multi-agent"
+  
+  # Se true, testa todas as combinações de modelos x arquiteturas
+  test_all_combinations: true
+  
+  # Modelos disponíveis para teste
+  # Formato: nome_modelo: [lista de parâmetros]
+  # Será convertido para "nome_modelo:parametro" (ex: gemma3:1b)
+  models:
+    gemma3:
+      - 1b
+    #  - 4b
+    #  - 12b
+    
+    qwen3:
+      - 1.7b
+    #  - 8b
+    #  - 14b
+    
+    qwen2.5-coder:
+      - 1.5b
+    #  - 7b
+    #  - 14b
+    
+    #gpt-oss:
+    #  - 20b

@@ -13,3 +13,6 @@ wheels/
 
 /data/
 /logs/
+
+.tui_state/
+.checkpoints/

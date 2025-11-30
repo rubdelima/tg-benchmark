@@ -192,7 +192,13 @@ class Thifany:
             )
             logger.debug(f"RESEARCHER: Subtask extraction prompt took {time.time() - start_time:.2f} seconds.")
 
-            return subtasks_response.response
+            # Verifica se o parse foi bem-sucedido
+            if isinstance(subtasks_response.response, PlanSubtasks):
+                return subtasks_response.response
+            
+            # Fallback: retorna estrutura vazia
+            logger.error("RESEARCHER: Failed to parse subtasks response. Returning empty subtasks.")
+            return PlanSubtasks(skeleton="", subtasks=[])
     
     def _plan_solutions(self, user_prompt:str) -> PlanSolutions:
         with StatusContext("RESEARCHER: Planning solutions.") as status:
@@ -219,7 +225,13 @@ class Thifany:
             )
             logger.debug(f"RESEARCHER: Solution extraction prompt took {time.time() - start_time:.2f} seconds.")
             
-            return solutions_response.response
+            # Verifica se o parse foi bem-sucedido
+            if isinstance(solutions_response.response, PlanSolutions):
+                return solutions_response.response
+            
+            # Fallback: retorna estrutura vazia
+            logger.error("RESEARCHER: Failed to parse solutions response. Returning empty solutions.")
+            return PlanSolutions(solutions=[])
     
     def _find_similar_tasks(self, base_task:BaseTask, top_k:int=3) -> str:
         similar_tasks = self.vector_buffer.semantic_search(base_task, top_k=top_k)

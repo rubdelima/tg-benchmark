@@ -40,7 +40,7 @@ _NOISY_LIBS = ["httpcore", "httpx", "urllib3", "asyncio", "matplotlib", "multipa
 for lib_name in _NOISY_LIBS:
     logging.getLogger(lib_name).setLevel(logging.WARNING)
 
-# 2.2 File Handler (Log em Arquivo)
+# 2.2 File Handler (Log em Arquivo - texto puro)
 _file_handler = logging.FileHandler(_LOG_PATH / _filename, encoding='utf-8')
 _file_handler.setLevel(logging.DEBUG) # Arquivo sempre grava DEBUG
 _file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
@@ -61,11 +61,18 @@ def _is_jupyter():
     except NameError:
         return False      # Probably standard Python interpreter
 
+def _should_force_color() -> bool:
+    """Verifica se deve forçar cores (FORCE_COLOR=1 do subprocess da TUI)"""
+    return os.environ.get('FORCE_COLOR', '').lower() in ('1', 'true', 'yes')
+
 _console = None
 
 if _is_jupyter():
     # Modo Notebook
     _console = Console(force_jupyter=True)
+elif _should_force_color():
+    # Modo Subprocess da TUI - forçar cores mesmo sem TTY
+    _console = Console(force_terminal=True, color_system="truecolor")
 else:
     # Modo Terminal Padrão
     _console = Console(force_terminal=True)
@@ -121,15 +128,35 @@ class _TextualHandler(logging.Handler):
     def __init__(self, rich_log_widget):
         super().__init__()
         self.widget = rich_log_widget
+        self._main_thread_id = None
+
+    def _set_main_thread(self, thread_id):
+        """Define a thread principal da TUI"""
+        self._main_thread_id = thread_id
 
     def emit(self, record):
+        import threading
+        import traceback as tb
         log_time = datetime.datetime.fromtimestamp(record.created).strftime("[%X]")
         level_color = "green"
         if record.levelno == logging.DEBUG: level_color = "magenta"
         elif record.levelno == logging.WARNING: level_color = "yellow"
         elif record.levelno == logging.ERROR: level_color = "red"
         msg = (f"[dim]{log_time}[/dim] [bold {level_color}]{record.levelname:<8}[/bold {level_color}] {record.getMessage()}")
-        self.widget.app.call_from_thread(self.widget.write, Text.from_markup(msg))
+        
+        # Verifica se estamos na mesma thread da TUI
+        current_thread = threading.current_thread().ident
+        try:
+            if self._main_thread_id and current_thread == self._main_thread_id:
+                # Mesma thread - usa call_later
+                self.widget.app.call_later(self.widget.write, Text.from_markup(msg))
+            else:
+                # Thread diferente - usa call_from_thread
+                self.widget.app.call_from_thread(self.widget.write, Text.from_markup(msg))
+        except Exception as e:
+            print(f"[LOGGER ERROR] {e}")
+            print(f"[LOGGER ERROR] main_thread_id={self._main_thread_id}, current_thread={current_thread}")
+            print(f"[LOGGER ERROR] Traceback:\n{tb.format_exc()}")
 
 class LogConsole(Vertical):
     DEFAULT_CSS = """
@@ -139,6 +166,12 @@ class LogConsole(Vertical):
     LogConsole LoadingIndicator { height: 1; width: auto; color: yellow; margin-right: 1; }
     LogConsole Label { color: $text; }
     """
+    
+    def __init__(self):
+        super().__init__()
+        self._main_thread_id = None
+        self._tui_handler = None
+    
     def compose(self):
         yield RichLog(id="rlog", markup=True)
         with Horizontal(id="status_bar"):
@@ -146,18 +179,37 @@ class LogConsole(Vertical):
             yield Label("", id="status_lbl")
 
     def on_mount(self):
+        import threading
+        self._main_thread_id = threading.current_thread().ident
+        
         rlog = self.query_one("#rlog", RichLog)
-        tui_h = _TextualHandler(rlog)
-        tui_h.setLevel(_LOG_LEVEL)
-        logging.getLogger().addHandler(tui_h)
+        self._tui_handler = _TextualHandler(rlog)
+        self._tui_handler._set_main_thread(self._main_thread_id)
+        self._tui_handler.setLevel(_LOG_LEVEL)
+        logging.getLogger().addHandler(self._tui_handler)
         _ui_hooks["start"], _ui_hooks["update"], _ui_hooks["stop"] = self._action_start, self._action_update, self._action_stop
 
+    def _safe_call(self, func):
+        """Chama função de forma segura, detectando a thread atual"""
+        import threading
+        import traceback as tb
+        current_thread = threading.current_thread().ident
+        try:
+            if current_thread == self._main_thread_id:
+                self.app.call_later(func)
+            else:
+                self.app.call_from_thread(func)
+        except Exception as e:
+            print(f"[LOGCONSOLE ERROR] {e}")
+            print(f"[LOGCONSOLE ERROR] main_thread_id={self._main_thread_id}, current_thread={current_thread}")
+            print(f"[LOGCONSOLE ERROR] Traceback:\n{tb.format_exc()}")
+
     def _action_start(self, msg):
-        self.app.call_from_thread(lambda: (setattr(self.query_one("#status_bar").styles, "display", "block"), self.query_one("#status_lbl", Label).update(msg)))
+        self._safe_call(lambda: (setattr(self.query_one("#status_bar").styles, "display", "block"), self.query_one("#status_lbl", Label).update(msg)))
     def _action_update(self, msg):
-        self.app.call_from_thread(lambda: self.query_one("#status_lbl", Label).update(msg))
+        self._safe_call(lambda: self.query_one("#status_lbl", Label).update(msg))
     def _action_stop(self):
-        self.app.call_from_thread(lambda: setattr(self.query_one("#status_bar").styles, "display", "none"))
+        self._safe_call(lambda: setattr(self.query_one("#status_bar").styles, "display", "none"))
 
 
 # --- 8. StatusContext (Com Timer Real-Time) ---
@@ -195,7 +247,7 @@ class StatusContext:
             self.task_id = self.progress.add_task(self.msg, total=None)
             self.progress.start()
         
-        # CASO 3: Apenas Arquivo
+        # CASO 3: Apenas Arquivo (sem spinner)
         else:
             logging.getLogger().info(f"⏳ [START] {self._get_msg_with_time_manual(self.msg)}")
             

@@ -160,6 +160,7 @@ class OllamaHandler:
                         current_time
                     )
                     sc.update(status_text)
+            sc.update(f"Generation completed in {time.time() - start_time:.2f}s. With {input_tokens} input tokens and {output_tokens} output tokens.")
         
         total_time = time.time() - start_time
         

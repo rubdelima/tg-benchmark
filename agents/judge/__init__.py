@@ -125,8 +125,14 @@ class Will:
                 response_format=Judgment
             )
         
-        logger.debug("Judge: Successfully extracted judgment feedback.")
-        return extraction_response.response
+        # Verifica se o parse foi bem-sucedido
+        if isinstance(extraction_response.response, Judgment):
+            logger.debug("Judge: Successfully extracted judgment feedback.")
+            return extraction_response.response
+        
+        # Fallback: se o parse falhou, retorna julgamento como incorreto
+        logger.error("Judge: Failed to parse judgment response. Returning default incorrect judgment.")
+        return Judgment(is_correct=False, feedback="Unable to parse judgment feedback from model response")
         
     def _parse_analyze_test_failures(self, response_text:str)-> BaseSolution:
         logger.debug("Judge: Parsing analyze test failures response.")
@@ -151,5 +157,14 @@ class Will:
                 response_format=BaseSolution
             )
         
-        return extraction_response.response
+        # Verifica se o parse foi bem-sucedido
+        if isinstance(extraction_response.response, BaseSolution):
+            return extraction_response.response
+        
+        # Fallback: se o parse falhou e retornou string, cria BaseSolution vazio com o texto
+        logger.error("Judge: Failed to parse analyze test failures response into BaseSolution. Using fallback.")
+        return BaseSolution(
+            context=response_text[:500] if response_text else "Error parsing context",
+            propose_solution="Unable to extract solution from response"
+        )
         

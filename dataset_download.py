@@ -32,6 +32,6 @@ for line in tqdm(ds, total=290):
     dataset_line = create_dataset_line(line)
     dataset_lines.append(dataset_line.model_dump())
 
-with open(".data/dataset.jsonl", "w", encoding="utf-8") as f:
+with open("./data/dataset.jsonl", "w", encoding="utf-8") as f:
     for data_line in dataset_lines:
         f.write(json.dumps(data_line) + "\n")
