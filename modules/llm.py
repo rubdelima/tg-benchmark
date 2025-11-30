@@ -53,6 +53,8 @@ class OllamaHandler:
                 messages=[{"role" : "user", "content" : "Return 'hi'"}],
                 keep_alive="-1m"
             )
+        self.total_input_tokens = 0
+        self.total_output_tokens = 0
 
     def _check_ollama_installed(self) -> bool:
         try:
@@ -160,6 +162,9 @@ class OllamaHandler:
                     sc.update(status_text)
         
         total_time = time.time() - start_time
+        
+        self.total_input_tokens += input_tokens
+        self.total_output_tokens += output_tokens
         
         # 5. Parse Final
         final_response = self._parse_response(full_response, response_format)

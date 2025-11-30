@@ -43,7 +43,7 @@ class Ellian(GeneratorCodeBaseModel):
             {"role": "system", "content": get_verbosity_prompt(self.verbosity)},
             *self._extract_solution_messages(solution)
         ]
-        logger.debug(f"Developer: Solution history messages: {messages}")
+        # logger.debug(f"Developer: Solution history messages: {messages}")
         generated_code = self._generation_loop(messages)
         solution.solution_history.append({"role": "developer","content": generated_code})
         return solution

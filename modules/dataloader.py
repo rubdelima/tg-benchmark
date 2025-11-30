@@ -34,7 +34,11 @@ class Dataloader:
     
     def __iter__(self):
         for item in self.dataset_list:
-            yield item
+            yield QuestionDataset(
+            **item.model_dump(),
+            public_test_cases = self._get_test_cases(item.question_id, "public"),
+            private_test_cases = self._get_test_cases(item.question_id, "private")
+        )
     
     @classmethod
     def load_jsonl(cls, filepath:str)->'Dataloader':
@@ -55,7 +59,7 @@ class Dataloader:
             output_path = dir_path / f"{idx}.out"
             if not input_path.exists() or not output_path.exists():
                 break
-            with open(input_path, "r") as infile, open(output_path, "r") as outfile:
+            with open(input_path, "r", encoding="utf-8") as infile, open(output_path, "r", encoding="utf-8") as outfile:
                 test_case = TestCase(
                     inputs=infile.read(),
                     expected_output=outfile.read()

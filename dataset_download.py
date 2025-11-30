@@ -10,9 +10,9 @@ def save_test_cases(test_cases_str:str, test_type:str, question_id:str):
     dir_path.mkdir(parents=True, exist_ok=True)
     
     for idx, test_case in enumerate(test_cases):
-        with open(dir_path / f"{idx}.in", "w") as infile:
+        with open(dir_path / f"{idx}.in", "w", encoding="utf-8") as infile:
             infile.write(test_case['input'])
-        with open(dir_path / f"{idx}.out", "w") as outfile:
+        with open(dir_path / f"{idx}.out", "w", encoding="utf-8") as outfile:
             outfile.write(test_case['output'])
 
 def create_dataset_line(line)-> QuestionDatasetBase:

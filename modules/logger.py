@@ -16,7 +16,7 @@ import time
 def _load_config():
     default_config = {"level": "INFO", "logs_path": "./logs/"}
     try:
-        with open("config.yaml", "r") as f:
+        with open("config.yaml", "r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
             return data.get("logging", default_config)
     except FileNotFoundError:
@@ -218,4 +218,5 @@ class StatusContext:
             # Apenas atualiza o texto, o tempo continua correndo sozinho
             self.progress.update(self.task_id, description=new_msg)
         else:
-            logging.getLogger().info(f"ℹ️ [STATUS] {self._get_msg_with_time_manual(new_msg)}")
+            pass
+            # logging.getLogger().info(f"ℹ️ [STATUS] {self._get_msg_with_time_manual(new_msg)}")

@@ -37,11 +37,10 @@ class GeneratorCodeBaseModel:
             return None
         return code.strip()
         
-    
     @staticmethod
     def _mypy_check(code: str,ignore_warnings: bool,ignore_function: Optional[str] = None) -> CheckResult:
         
-        with NamedTemporaryFile(mode='w+', suffix='.py', delete=False) as temp_file:
+        with NamedTemporaryFile(mode='w+', suffix='.py', delete=False, encoding='utf-8') as temp_file:
             temp_file.write(code)
             temp_file_path = Path(temp_file.name)
         stdout, stderr, exit_status = api.run([str(temp_file_path)])

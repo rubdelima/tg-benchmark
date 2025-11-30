@@ -136,8 +136,6 @@ class TestRunner:
             expected_output_norm = expected_data.strip().replace('\r\n', '\n')
             
             logger.debug(f"Return code: {result.returncode}")
-            logger.debug(f"Normalized actual output:\n{actual_output}")
-            logger.debug(f"Normalized expected output:\n{expected_output_norm}")
             logger.debug(f"Response OK: {actual_output == expected_output_norm}")
             
             # 1. Verifica Erros de Runtime (Crash, EOFError, SyntaxError que passou batido)
