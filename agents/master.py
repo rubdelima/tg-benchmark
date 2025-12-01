@@ -7,7 +7,7 @@ from schemas.tests import TestSuiteBase
 from modules.llm import OllamaHandler
 from modules.dataloader import QuestionDataset
 from modules.test_runner import TestRunner
-from agents.reseacher.prompt_question import test_cases_template, create_question_solution_sys
+from agents.reseacher.prompt_question import test_cases_template, create_question_solution_user
 
 class Davi:
     def __init__(self, handler: OllamaHandler, max_retries: int = 2):
@@ -24,7 +24,7 @@ class Davi:
             for i, tc in enumerate(question_dataset.public_test_cases)
         )
         
-        return create_question_solution_sys.format(
+        return create_question_solution_user.format(
             title=question_dataset.title,
             content=question_dataset.content,
             tests_cases=test_cases_str

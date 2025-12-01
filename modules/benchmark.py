@@ -18,7 +18,7 @@ from modules.checkpoint import (
 )
 from tui.state import get_tui_writer
 from agents.developer import Ellian
-from agents.orchestrator import Vivi, OrchestratorConfig
+from agents.master import Davi
 from schemas.tests import TestSuiteBase
 
 logger = get_logger(__name__)
@@ -99,12 +99,11 @@ def run_single_benchmark(
         active_handler = handler
     else:
         mc = config.get("multi_agent", {})
-        multi_agent = Vivi(OrchestratorConfig(
-            model=model, max_iter=mc.get("max_iter", 2), max_retry=mc.get("max_retry", 3),
-            dev_verbosity=mc.get("dev_verbosity", 3), judge_level=mc.get("judge_level", 1),
-            use_buffer=mc.get("use_buffer", True), ignore_warnings=mc.get("ignore_warnings", True),
-        ))
-        active_handler = multi_agent.ollama_handler
+        multi_agent = Davi(
+            handler=handler,
+            max_retries=mc.get("max_retries", 3),
+        )
+        active_handler = handler
     
     test_runner = TestRunner()
     start_time = time.time()
@@ -129,7 +128,10 @@ def run_single_benchmark(
             
             q_start = time.time()
             try:
-                code = agent.generate_code_from_question_dataset(full_q) if agent else multi_agent.solve_question_dataset(full_q)
+                if agent:
+                    code = agent.generate_code_from_question_dataset(full_q)
+                else:
+                    code, _ = multi_agent.solve_question_dataset(full_q)
                 code_time = time.time() - q_start
                 
                 q_in = active_handler.total_input_tokens - cur_in

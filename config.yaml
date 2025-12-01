@@ -59,3 +59,11 @@ benchmark:
     
     #gpt-oss:
     #  - 20b
+
+# =============================================================================
+# Multi-Agent Configuration (Configurações do agente Davi)
+# =============================================================================
+
+multi_agent:
+  # Número máximo de tentativas de melhoria do código
+  max_retries: 3
