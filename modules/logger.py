@@ -249,7 +249,7 @@ class StatusContext:
         
         # CASO 3: Apenas Arquivo (sem spinner)
         else:
-            logging.getLogger().info(f"⏳ [START] {self._get_msg_with_time_manual(self.msg)}")
+            logging.getLogger().debug(f"⏳ [START] {self._get_msg_with_time_manual(self.msg)}")
             
         return self
 
@@ -259,7 +259,7 @@ class StatusContext:
         elif self.progress:
             self.progress.stop()
         
-        logging.getLogger().info(f"✅ [END] {self._get_msg_with_time_manual(self.msg)}")
+        logging.getLogger().debug(f"✅ [END] {self._get_msg_with_time_manual(self.msg)}")
 
     def update(self, new_msg):
         self.msg = new_msg

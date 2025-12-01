@@ -20,7 +20,7 @@ from modules.dataloader import QuestionDataset
 from agents.reseacher.prompt_plan import decide_plan_system_prompt, user_prompt_template_decide, user_prompt_template_base, plan_type_extract_prompt
 from agents.reseacher.prompt_subtasks import system_generate_subtasks_prompt, system_extract_subtasks_prompt
 from agents.reseacher.prompt_solutions import system_generate_solutions_prompt, system_extract_solutions_prompt, create_template_prompt
-from agents.reseacher.prompt_question import system_extract_task_prompt, user_extract_task_template, base_code, system_extract_task_json_prompt
+from agents.reseacher.prompt_question import system_extract_task_prompt, user_extract_task_template, base_code, system_extract_task_json_prompt, create_question_solution_sys,  test_cases_template
 from agents.utils import extract_json
 
 logger = get_logger(__name__)
@@ -117,7 +117,21 @@ class Thifany:
             best_solution_rating=0.0,
             code=""
         )
+    
+    def create_question_solution(self, prompt:str) -> str:
         
+        messages = [
+            {"role": "system", "content": create_question_solution_sys},
+            {"role": "user", "content": prompt}
+        ]
+        
+        with StatusContext("RESEARCHER: Creating question solution.") as status:
+            logger.debug("RESEARCHER: Sending question solution prompt to Ollama.")
+            start_time = time.time()
+            response = self.ollama_handler.chat(messages=messages)
+            logger.debug(f"RESEARCHER: Question solution prompt took {time.time() - start_time:.2f} seconds.")
+        
+        return response.response
     # PRIVATE FUNCTIONS
     
     @staticmethod

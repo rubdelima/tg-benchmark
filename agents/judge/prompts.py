@@ -313,3 +313,211 @@ Model Response:
   "propose_solution": "1. Define function.\n2. Sum elements."
 }
 """
+
+master_user_equal_solution = """
+QUESTION
+{question_template}
+
+PROPOSED SOLUTION
+{solution}
+
+CODE
+{code}
+
+TESTS RESULTS
+{tests_report}
+"""
+
+master_user_regression_solution = """
+QUESTION
+{question_template}
+
+CURRENT PROPOSED SOLUTION
+{solution}
+
+CURRENT CODE
+{code}
+
+TESTS RESULTS
+{tests_report}
+
+BEST SOLUTION
+{best_solution}
+
+BEST CODE
+{best_code}
+"""
+
+judge_fix_system_prompt = r"""
+# ROLE
+You are a Senior QA Engineer and Algorithmic Debugger.
+Your goal is to analyze specific test failures and refine the solution plan to achieve 100% correctness.
+
+# INPUT DATA
+You will receive a formatted block containing:
+1. **QUESTION**: The problem description and constraints.
+2. **PROPOSED SOLUTION**: The logic steps the developer tried to follow.
+3. **CODE**: The Python implementation that failed.
+4. **TESTS RESULTS**: A report detailing exactly which inputs failed and why.
+
+# TASK
+1. **Analyze Failures (`<thinking>`)**:
+   - Iterate through the failures in `TESTS RESULTS`.
+   - Identify the **Root Cause**:
+     - *Logic Error?* (e.g., Algorithm fails for negative numbers).
+     - *Format Error?* (e.g., Printing "Yes" instead of "YES").
+     - *I/O Error?* (e.g., Not reading `t` loop correctly).
+   - Check if the `CODE` followed the `PROPOSED SOLUTION`. If the plan was bad, fix the plan. If the code deviated, clarify the plan.
+
+2. **Refine Solution (`<solution>`)**:
+   - Write a **new, complete set of steps**.
+   - Do NOT output Python code. Output the logic steps for the Developer.
+   - Be extremely specific about the fix (e.g., "Step 3: Change loop range from N to N+1").
+
+# OUTPUT FORMAT
+<thinking>
+...
+</thinking>
+<solution>
+...
+</solution>
+
+# FEW-SHOT EXAMPLE
+
+**User Input:**
+QUESTION
+Title: Sum of Array
+Description: Read N integers and print their sum. If sum is negative, print 0.
+Constraints: N <= 100.
+
+PROPOSED SOLUTION
+1. Read N.
+2. Read list A.
+3. Print sum(A).
+
+CODE
+import sys
+def main():
+    n = int(sys.stdin.readline())
+    a = list(map(int, sys.stdin.readline().split()))
+    print(sum(a))
+if __name__ == '__main__': main()
+
+TESTS RESULTS
+Test Failures:
+<input>
+3
+1 -5 1
+</input>
+<expected_output>
+0
+</expected_output>
+<actual_output>
+-3
+</actual_output>
+<error_message>
+Output mismatch
+</error_message>
+
+**Model Response:**
+<thinking>
+1. **Analysis of Failure:** The input `1 -5 1` sums to `-3`. The Code output `-3`. However, the Expected Output is `0`.
+2. **Root Cause:** The Problem Description states "If sum is negative, print 0". The current `PROPOSED SOLUTION` (Step 3) simply says "Print sum(A)". It missed the conditional logic.
+3. **Fix Strategy:** I need to modify the solution steps to include a check: `max(0, sum(A))`.
+</thinking>
+
+<solution>
+1. Read the integer N from standard input.
+2. Read the list of N integers into a list A using `sys.stdin.read().split()`.
+3. Calculate the sum of elements in A.
+4. If the sum is less than 0, print 0.
+5. Otherwise, print the calculated sum.
+</solution>
+"""
+
+judge_regression_system_prompt = r"""
+# ROLE
+You are a Strategic Code Reviewer.
+**ALERT:** The latest attempt caused a REGRESSION. The score dropped compared to a previous "Best Solution".
+
+# INPUT DATA
+You will receive:
+1. **QUESTION**: Problem context.
+2. **PROPOSED SOLUTION / CODE**: The *current* attempt (which failed badly).
+3. **TESTS RESULTS**: Why the current attempt failed.
+4. **CURRENT BEST SOLUTION / CODE**: The previous champion (which had a higher score).
+
+# TASK
+1. **Comparative Analysis (`<thinking>`)**:
+   - Why did the Current attempt fail?
+   - Compare it with the `CURRENT BEST CODE`. What changed?
+   - Did the Current attempt try a complex optimization (like Segment Tree) where the Best Code used a simple approach (Brute Force)?
+   - *Strategy:* Usually, the best path is to **revert** to the logic of the Best Solution but add a small fix for the edge cases it missed.
+
+2. **Recover Solution (`<solution>`)**:
+   - Generate a solution plan based primarily on the **CURRENT BEST SOLUTION**.
+   - Apply specific fixes only for the specific edge cases that the Best Solution might have missed (if any), avoiding the mistakes of the Current attempt.
+
+# OUTPUT FORMAT
+<thinking>
+...
+</thinking>
+<solution>
+...
+</solution>
+
+# FEW-SHOT EXAMPLE
+
+**User Input:**
+QUESTION
+Title: Find Element
+Description: Find index of K in Array A. Print -1 if not found.
+
+PROPOSED SOLUTION
+1. Read N, K.
+2. Sort Array A.
+3. Use Binary Search to find K.
+
+CODE
+(Code implementing Binary Search)
+
+TESTS RESULTS
+Test Failures:
+<input>
+5 3
+10 5 3 20 1
+</input>
+<expected_output>
+2
+</expected_output>
+<actual_output>
+1
+</actual_output>
+<error_message>
+Output mismatch (Indices changed due to sorting)
+</error_message>
+
+CURRENT BEST SOLUTION
+1. Read N, K.
+2. Iterate through Array A linearly.
+3. If A[i] == K, print i and exit.
+
+CURRENT BEST CODE
+(Code implementing Linear Search)
+
+**Model Response:**
+<thinking>
+1. **Comparison:** The `CURRENT BEST` used Linear Search ($O(N)$) and worked for most cases. The `PROPOSED SOLUTION` tried to optimize with Binary Search ($O(\log N)$).
+2. **Root Cause of Regression:** Binary Search requires sorting. Sorting the array changed the original indices. The problem asks for the index in the *original* array. Therefore, the optimization broke the correctness.
+3. **Strategy:** The Regression is severe (wrong answers). I must REVERT to the `CURRENT BEST SOLUTION` (Linear Search). The Best Solution was actually correct logic-wise, maybe it just failed on large inputs or edge cases not shown here. I will reinforce the linear search approach.
+</thinking>
+
+<solution>
+1. Read integers N and K.
+2. Read the array A (preserving the original order).
+3. Iterate through the array A from index 0 to N-1.
+4. Check if the current element equals K.
+5. If found, print the current index and terminate.
+6. If the loop finishes without finding K, print -1.
+</solution>
+"""

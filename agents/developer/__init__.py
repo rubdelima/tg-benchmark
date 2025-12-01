@@ -16,6 +16,7 @@ from schemas.solution import Solution
 from .prompts_dev_verbosity import get_verbosity_prompt, user_prompt_example
 from .pompts_join_tasks import join_tasks, system_join_tasks_prompt
 from .prompts_direct import system_direct_solve_prompt, user_direct_solve_template, test_cases_template
+from .prompts_master import developer_system_prompt
 
 logger = get_logger(__name__)
 
@@ -72,6 +73,13 @@ class Ellian(GeneratorCodeBaseModel):
         ]
         return self._generation_loop(messages)
     
+    def generate_code_from_master(self, question_template: str, solution: str)->str:
+        messages = [
+            {"role": "system", "content": developer_system_prompt},
+            {"role": "user", "content": question_template + f"\n\n# PROPOSED SOLUTION\n{solution}"},
+        ]
+        return self._generation_loop(messages)
+    
     def _generation_loop(self, messages: List[Dict]) ->str:
         with StatusContext(f"Generating code for solution (1/{self.generation_retry_attempts})") as status:
             for attempt in range(1, self.generation_retry_attempts + 1):
@@ -84,9 +92,10 @@ class Ellian(GeneratorCodeBaseModel):
                 
                 logger.debug(f"Developer: Response generation took {elapsed_time:.2f} seconds. With {response.output_tokens} output tokens.")
                 
-
+                code = self.extract_code_from_response(response.response)
+                
                 status.update("Developer: Parsing generated code")
-                parse_code_result = self.parse_code(response.response, ignore_warnings=self.ignore_warnings)
+                parse_code_result = self.parse_code(code, ignore_warnings=self.ignore_warnings)
                 
                 if parse_code_result.success:
                     logger.debug("Developer: Code parsed successfully.")

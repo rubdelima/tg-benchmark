@@ -14,7 +14,9 @@ from schemas.tests import TestSuite, TestsResult
 from .prompts import (
     judge_code_system_prompt, evaluate_solution_system_prompt,
     extract_feedback_system_prompt, error_analysis_system_prompt,
-    analyze_test_failures_user_template, extract_solution_system_prompt
+    analyze_test_failures_user_template, extract_solution_system_prompt,
+    judge_fix_system_prompt, judge_regression_system_prompt,
+    master_user_equal_solution, master_user_regression_solution
 )
 
 feedback_pattern = r"<feedback>\s*(.*?)\s*</feedback>"
@@ -100,6 +102,40 @@ class Will:
         solution.propose_solution = solution_update.propose_solution
         
         return solution
+    
+    def evaluate_and_suggest(self, question_template: str, code: str, solution: str, test_result: TestsResult, best_code: str, best_solution: str) -> str:
+        
+        if best_solution == solution:
+            messages = [
+                {"role": "system", "content": judge_fix_system_prompt},
+                {"role": "user", "content": master_user_equal_solution.format(
+                    question_template=question_template,
+                    code=code,
+                    solution=solution,
+                    tests_report=test_result.display_errors()
+                )}
+            ]
+        else:
+            messages = [
+                {"role": "system", "content": judge_regression_system_prompt},
+                {"role": "user", "content": master_user_regression_solution.format(
+                    question_template=question_template,
+                    code=code,
+                    solution=solution,
+                    best_code=best_code,
+                    best_solution=best_solution,
+                    tests_report=test_result.display_errors()
+                )}
+            ]
+        
+        
+        logger.info("Judge: Evaluating code and suggesting solution improvements.")
+        start_time = time.time()
+        with StatusContext("Judge: Evaluating code and suggesting solution improvements") as status:
+            response = self.ollama_handler.chat(messages=messages)
+        logger.debug(f"Judge: Evaluation and suggestion response generation took {time.time() - start_time:.2f} seconds.")
+        
+        return response.response
     
     
     def _parse_judgment_response(self, response_text: str) -> Judgment:

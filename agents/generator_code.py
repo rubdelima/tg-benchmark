@@ -100,3 +100,28 @@ class GeneratorCodeBaseModel:
             )
         
         return self._mypy_check(code_blocks[0], ignore_warnings=ignore_warnings, ignore_function=ignore_function)
+    
+    @staticmethod
+    def extract_code_from_response(response_text: str) -> str:        
+        # Flags: DOTALL (ponto pega quebra de linha) e IGNORECASE
+        flags = re.DOTALL | re.IGNORECASE
+
+        # 1. Tentativa Principal: Tag Explicita <code>
+        # O padrão procura por <code>, captura tudo (greedy) até </code>
+        # Usamos findall para pegar o último bloco caso o modelo tenha feito rascunhos
+        code_tag_matches = re.findall(r'<code>\s*(.*?)\s*</code>', response_text, flags)
+        if code_tag_matches:
+            return code_tag_matches[-1].strip()
+
+        # 2. Tentativa Secundária: Markdown Python
+        markdown_py_matches = re.findall(r'```python\s*(.*?)\s*```', response_text, flags)
+        if markdown_py_matches:
+            return markdown_py_matches[-1].strip()
+
+        # 3. Tentativa Terciária: Markdown Genérico
+        # Útil se o modelo esquecer de especificar a linguagem
+        markdown_generic_matches = re.findall(r'```\s*(.*?)\s*```', response_text, flags)
+        if markdown_generic_matches:
+            return markdown_generic_matches[-1].strip()
+
+        return response_text
