@@ -16,7 +16,7 @@ from schemas.solution import Solution
 from .prompts_dev_verbosity import get_verbosity_prompt, user_prompt_example
 from .pompts_join_tasks import join_tasks, system_join_tasks_prompt
 from .prompts_direct import system_direct_solve_prompt, user_direct_solve_template, test_cases_template
-from .prompts_master import developer_system_prompt
+from .prompts_master import developer_system_prompt, full_context
 
 logger = get_logger(__name__)
 
@@ -76,11 +76,15 @@ class Ellian(GeneratorCodeBaseModel):
     def generate_code_from_master(self, question_template: str, solution: str)->str:
         messages = [
             {"role": "system", "content": developer_system_prompt},
-            {"role": "user", "content": question_template + f"\n\n# PROPOSED SOLUTION\n{solution}"},
+            {"role": "user", "content": full_context.format(
+                problem_context=question_template,
+                researcher_output_raw=solution,
+                question_title=question_template.splitlines()[1].replace("# PROBLEM TITLE", "").strip()
+            )}
         ]
-        return self._generation_loop(messages)
-    
-    def _generation_loop(self, messages: List[Dict]) ->str:
+        return self._generation_loop(messages, return_any=True)
+
+    def _generation_loop(self, messages: List[Dict], return_any=False) ->str:
         with StatusContext(f"Generating code for solution (1/{self.generation_retry_attempts})") as status:
             for attempt in range(1, self.generation_retry_attempts + 1):
                 
@@ -103,7 +107,9 @@ class Ellian(GeneratorCodeBaseModel):
 
                 logger.warning("Developer: Generated code has issues, preparing to retry.")
                 messages.extend(self.get_retry_messages(parse_code_result, response))
-                
+        
+        if return_any:
+            return code
         raise DeveloperGenerationError("Failed to generate valid Python code after multiple attempts.", messages=messages)
     
     @staticmethod

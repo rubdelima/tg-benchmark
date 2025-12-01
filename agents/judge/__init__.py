@@ -112,7 +112,7 @@ class Will:
                     question_template=question_template,
                     code=code,
                     solution=solution,
-                    tests_report=test_result.display_errors()
+                    tests_report=test_result.display_errors()[:5]
                 )}
             ]
         else:
@@ -124,7 +124,7 @@ class Will:
                     solution=solution,
                     best_code=best_code,
                     best_solution=best_solution,
-                    tests_report=test_result.display_errors()
+                    tests_report=test_result.display_errors()[:5]
                 )}
             ]
         

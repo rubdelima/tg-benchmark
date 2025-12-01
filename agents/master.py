@@ -30,40 +30,54 @@ class Davi:
             tests_cases=test_cases_str
         )
     
-    def solve_question_dataset(self, question_dataset: QuestionDataset):
+    def solve_question_dataset(self, question_dataset: QuestionDataset)->tuple[str, list[dict]]:
         best_code = ""
         best_solution = ""
         best_score = -1.0
         test_suite = TestSuiteBase(test_cases=question_dataset.private_test_cases)
-        question_template = self.create_question_template(question_dataset)
-        
-        # Passo 1: Pesquisador Busca Informações e Gera Primieira Solução
-        solution = self.researcher.create_question_solution(question_template)
-        
-        # Loop de Melhoria Contínua
-        attempts = 0
-        while True:
-            # Passo 2: Desenvolvedor Gera Código com Base na Solução Pensada
-            code = self.dev.generate_code_from_master(question_template, solution)
-            
-            # Passo 3: Executor de Testes Roda a Suíte de Testes
-            test_result = self.test_runner.run(test_suite, code)
-            
-            # Atualiza Melhor Código e Solução se Necessário
-            if test_result.success_rate >= best_score:
-                best_code = code
-                best_solution = solution
-                best_score = test_result.success_rate
-            
-            # Encerra o loop se todos os testes passaram
-            if test_result.success_rate == 1.0:
-                break
-            
-            attempts += 1
-            if attempts >= self.max_retries:
-                break
-            
-            # Passo 4: Juiz Avalia o Código e Fornece nova Solução
-            solution = self.judge.evaluate_and_suggest(question_template, code, solution, test_result, best_code, best_solution)
+        outputs = []
+        try:
+            question_template = self.create_question_template(question_dataset)
+            outputs.append({"question_template": question_template})
+            # Passo 1: Pesquisador Busca Informações e Gera Primieira Solução
+            solution = self.researcher.create_question_solution(question_template)
+            # Loop de Melhoria Contínua
+            attempts = 0
+            outputs.append({f"solution_{attempts}": solution})
 
-        return best_code, best_solution, best_score
+            while True:
+                # Passo 2: Desenvolvedor Gera Código com Base na Solução Pensada
+                code = self.dev.generate_code_from_master(question_template, solution)
+                outputs.append({f"code_{attempts}": code})
+
+                # Passo 3: Executor de Testes Roda a Suíte de Testes
+                test_result = self.test_runner.run(test_suite, code)
+                
+                for test_error in test_result.errors[:5]:  # Limita a 5 erros para evitar excesso de informação
+                    outputs.append({f"test_failure_{attempts}": {
+                        "test_input": test_error.test_input,
+                        "expected_output": test_error.expected_output,
+                        "actual_output": test_error.actual_output,
+                        "error_message": test_error.error_message
+                    }})
+
+                # Atualiza Melhor Código e Solução se Necessário
+                if test_result.success_rate >= best_score:
+                    best_code = code
+                    best_solution = solution
+                    best_score = test_result.success_rate
+
+                # Encerra o loop se todos os testes passaram
+                if test_result.success_rate == 1.0:
+                    break
+                
+                attempts += 1
+                if attempts >= self.max_retries:
+                    break
+                
+                # Passo 4: Juiz Avalia o Código e Fornece nova Solução
+                solution = self.judge.evaluate_and_suggest(question_template, code, solution, test_result, best_code, best_solution)
+                outputs.append({f"solution_{attempts}": solution})
+        finally:
+            return best_code, outputs
+        

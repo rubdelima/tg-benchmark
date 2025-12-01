@@ -371,7 +371,8 @@ You will receive a formatted block containing:
 
 2. **Refine Solution (`<solution>`)**:
    - Write a **new, complete set of steps**.
-   - Do NOT output Python code. Output the logic steps for the Developer.
+   - **CRITICAL:** Write steps in PLAIN ENGLISH logic (Pseudocode).
+   - **DO NOT** write Python code, functions, or imports inside `<solution>`.
    - Be extremely specific about the fix (e.g., "Step 3: Change loop range from N to N+1").
 
 # OUTPUT FORMAT
@@ -428,13 +429,12 @@ Output mismatch
 
 <solution>
 1. Read the integer N from standard input.
-2. Read the list of N integers into a list A using `sys.stdin.read().split()`.
+2. Read the list of N integers into a list A using a token-based reading strategy.
 3. Calculate the sum of elements in A.
 4. If the sum is less than 0, print 0.
 5. Otherwise, print the calculated sum.
 </solution>
 """
-
 judge_regression_system_prompt = r"""
 # ROLE
 You are a Strategic Code Reviewer.
@@ -451,12 +451,13 @@ You will receive:
 1. **Comparative Analysis (`<thinking>`)**:
    - Why did the Current attempt fail?
    - Compare it with the `CURRENT BEST CODE`. What changed?
-   - Did the Current attempt try a complex optimization (like Segment Tree) where the Best Code used a simple approach (Brute Force)?
    - *Strategy:* Usually, the best path is to **revert** to the logic of the Best Solution but add a small fix for the edge cases it missed.
 
 2. **Recover Solution (`<solution>`)**:
    - Generate a solution plan based primarily on the **CURRENT BEST SOLUTION**.
-   - Apply specific fixes only for the specific edge cases that the Best Solution might have missed (if any), avoiding the mistakes of the Current attempt.
+   - **CRITICAL:** Write steps in PLAIN ENGLISH logic (Pseudocode).
+   - **DO NOT** write Python code inside `<solution>`.
+   - Apply specific fixes only for the specific edge cases that the Best Solution might have missed.
 
 # OUTPUT FORMAT
 <thinking>
@@ -509,7 +510,7 @@ CURRENT BEST CODE
 <thinking>
 1. **Comparison:** The `CURRENT BEST` used Linear Search ($O(N)$) and worked for most cases. The `PROPOSED SOLUTION` tried to optimize with Binary Search ($O(\log N)$).
 2. **Root Cause of Regression:** Binary Search requires sorting. Sorting the array changed the original indices. The problem asks for the index in the *original* array. Therefore, the optimization broke the correctness.
-3. **Strategy:** The Regression is severe (wrong answers). I must REVERT to the `CURRENT BEST SOLUTION` (Linear Search). The Best Solution was actually correct logic-wise, maybe it just failed on large inputs or edge cases not shown here. I will reinforce the linear search approach.
+3. **Strategy:** The Regression is severe. I must REVERT to the `CURRENT BEST SOLUTION` logic.
 </thinking>
 
 <solution>
