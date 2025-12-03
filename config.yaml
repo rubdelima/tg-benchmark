@@ -22,8 +22,12 @@ dataset:
   medium_samples: 30
   hard_samples: 30
 
-terminal:
-  hide_ollama: false
+generation_config:
+  temperature: 0.0
+  max_tokens_response: 16384
+  repeat_penalty: 1.3
+  repeat_last_n: 512 
+
 
 # =============================================================================
 # Benchmark Configuration (Modelos e Arquiteturas)
@@ -31,12 +35,10 @@ terminal:
 
 benchmark:
   # Arquiteturas a serem testadas
+  # Nota: modelos com "cloud" no parâmetro só rodam em "simple"
   architectures:
     - "simple"
     - "multi-agent"
-  
-  # Se true, testa todas as combinações de modelos x arquiteturas
-  test_all_combinations: true
   
   # Modelos disponíveis para teste
   # Formato: nome_modelo: [lista de parâmetros]
@@ -44,21 +46,28 @@ benchmark:
   models:
     gemma3:
       - 1b
-    #  - 4b
-    #  - 12b
+      - 4b
+      - 12b
     
     qwen3:
       - 1.7b
-    #  - 8b
-    #  - 14b
+      - 8b
+      - 14b
     
     qwen2.5-coder:
       - 1.5b
-    #  - 7b
-    #  - 14b
+      - 7b
+      - 14b
     
-    #gpt-oss:
-    #  - 20b
+    gpt-oss:
+      - 20b
+
+    devstral:
+      - latest
+    
+    qwen3-coder:
+      - 480b-cloud
+
 
 # =============================================================================
 # Multi-Agent Configuration (Configurações do agente Davi)

@@ -170,15 +170,25 @@ def get_score_color(score: float) -> str:
     """
     Get Rich color name based on score.
     
+    0-20: Vermelho
+    21-40: Laranja
+    41-60: Amarelo
+    61-80: Verde
+    81-100: Azul
+    
     Args:
         score: Score value (0-100)
         
     Returns:
         Rich color name
     """
-    if score >= 70:
-        return "green"
-    elif score >= 40:
-        return "yellow"
-    else:
+    if score <= 20:
         return "red"
+    elif score <= 40:
+        return "orange1"
+    elif score <= 60:
+        return "yellow"
+    elif score <= 80:
+        return "green"
+    else:
+        return "bright_blue"

@@ -1,5 +1,6 @@
 """
 Módulo de gerenciamento de checkpoints para benchmarks.
+Agora salva diretamente em results (com escrita atômica).
 """
 import json
 from pathlib import Path
@@ -12,11 +13,8 @@ logger = get_logger(__name__)
 
 
 def get_checkpoint_path(model: str, architecture: str, checkpoints_dir: str = "./.checkpoints/") -> Path:
-    """Retorna o caminho do arquivo de checkpoint."""
-    checkpoint_dir = Path(checkpoints_dir)
-    checkpoint_dir.mkdir(exist_ok=True)
-    safe_model = model.replace(":", "_").replace("/", "_")
-    return checkpoint_dir / f"checkpoint_{safe_model}_{architecture}.json"
+    """DEPRECATED: Retorna caminho do resultado (não mais checkpoint separado)."""
+    return get_result_path(model, architecture, "./results/")
 
 
 def get_result_path(model: str, architecture: str, results_dir: str = "./results/") -> Path:
@@ -28,18 +26,19 @@ def get_result_path(model: str, architecture: str, results_dir: str = "./results
 
 
 def load_checkpoint(checkpoint_path: Path) -> Optional[Dict[str, Any]]:
-    """Carrega checkpoint se existir."""
+    """Carrega resultado existente (funciona como checkpoint)."""
+    # Tenta carregar do results primeiro
     if checkpoint_path.exists():
         try:
             with open(checkpoint_path, "r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception as e:
-            logger.warning(f"Erro ao carregar checkpoint: {e}")
+            logger.warning(f"Erro ao carregar resultados: {e}")
     return None
 
 
 def save_checkpoint(checkpoint_path: Path, model: str, architecture: str, results: List[Dict]) -> None:
-    """Salva checkpoint."""
+    """Salva diretamente em results com escrita atômica."""
     try:
         data = {
             "model": model,
@@ -47,19 +46,23 @@ def save_checkpoint(checkpoint_path: Path, model: str, architecture: str, result
             "results": results,
             "saved_at": datetime.now().isoformat(),
         }
-        with open(checkpoint_path, "w", encoding="utf-8") as f:
+        # Escrita atômica: escreve em .tmp e renomeia
+        temp_path = checkpoint_path.with_suffix(".tmp")
+        with open(temp_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, default=str)
+        temp_path.replace(checkpoint_path)
     except Exception as e:
-        logger.warning(f"Erro ao salvar checkpoint: {e}")
+        logger.warning(f"Erro ao salvar resultados: {e}")
 
 
 def clear_checkpoint(checkpoint_path: Path) -> None:
-    """Remove arquivo de checkpoint."""
-    if checkpoint_path.exists():
-        checkpoint_path.unlink()
+    """Não faz nada - results não deve ser removido."""
+    pass
 
 
 def save_results(result_path: Path, data: Dict[str, Any]) -> None:
-    """Salva resultados finais."""
-    with open(result_path, "w", encoding="utf-8") as f:
+    """Salva resultados finais com escrita atômica."""
+    temp_path = result_path.with_suffix(".tmp")
+    with open(temp_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4)
+    temp_path.replace(result_path)

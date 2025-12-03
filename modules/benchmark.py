@@ -1,10 +1,13 @@
 """
 Módulo principal de execução de benchmarks.
 """
+import json
+import re
 import time
 import traceback
 from datetime import datetime
-from typing import Dict, Any, List
+from pathlib import Path
+from typing import Dict, Any, List, Optional
 
 from tqdm.auto import tqdm
 
@@ -23,6 +26,31 @@ from schemas.tests import TestSuiteBase
 
 logger = get_logger(__name__)
 tui = get_tui_writer()
+
+
+def sanitize_model_name(model: str) -> str:
+    """Converte nome do modelo para nome de pasta válido."""
+    return re.sub(r'[<>:"/\\|?*]', '_', model).replace(':', '_')
+
+
+def save_history_file(results_dir: str, model: str, question_id: str, history: Any) -> Optional[str]:
+    """
+    Salva histórico em arquivo separado.
+    Retorna o caminho relativo do arquivo ou None se não houver histórico.
+    """
+    if history is None:
+        return None
+    
+    model_folder = sanitize_model_name(model)
+    history_dir = Path(results_dir) / model_folder
+    history_dir.mkdir(parents=True, exist_ok=True)
+    
+    history_file = history_dir / f"{question_id}.json"
+    with open(history_file, "w", encoding="utf-8") as f:
+        json.dump(history, f, indent=2, ensure_ascii=False)
+    
+    # Retorna caminho relativo à pasta results
+    return f"{model_folder}/{question_id}.json"
 
 
 def calculate_metrics(results: List[Dict]) -> Dict[str, Any]:
@@ -57,19 +85,20 @@ def run_single_benchmark(
 ) -> Dict[str, Any]:
     """Executa benchmark para uma combinação modelo/arquitetura."""
     paths = config.get("paths", {})
-    checkpoint_path = get_checkpoint_path(model, architecture, paths.get("checkpoints", "./.checkpoints/"))
-    result_path = get_result_path(model, architecture, paths.get("results", "./results/"))
+    results_dir = paths.get("results", "./results/")
+    # Agora salva direto em results (não mais em .checkpoints)
+    result_path = get_result_path(model, architecture, results_dir)
     
     # Dataset config
     ds_cfg = config.get("dataset", {})
     easy, medium, hard = ds_cfg.get("easy_samples", 30), ds_cfg.get("medium_samples", 30), ds_cfg.get("hard_samples", 30)
     
-    # Checkpoint
+    # Carrega resultados anteriores (funciona como checkpoint)
     start_index, results = 0, []
     acc_in_tokens, acc_out_tokens = 0, 0
     
     if resume:
-        checkpoint = load_checkpoint(checkpoint_path)
+        checkpoint = load_checkpoint(result_path)
         if checkpoint:
             results = checkpoint.get("results", [])
             start_index = len(results)
@@ -83,12 +112,20 @@ def run_single_benchmark(
     total = len(dataset)
     logger.info(f"📊 Dataset: {total} questões")
     
-    # Iniciar estado TUI
-    tui.start_run(model, architecture, total)
+    # Iniciar estado TUI (passa resultados do checkpoint para mostrar progresso correto)
+    tui.start_run(model, architecture, total, resumed_results=results if results else None)
     
     # Modelo
     logger.info(f"🔄 Carregando {model}...")
-    handler = OllamaHandler(model_name=model, keep_alive=config.get("agent", {}).get("keep_alive", True))
+    gen_cfg = config.get("generation_config", {})
+    handler = OllamaHandler(
+        model_name=model, 
+        temperature=gen_cfg.get("temperature", 0.0),
+        max_tokens=gen_cfg.get("max_tokens_response", 16384),
+        repeat_penalty=gen_cfg.get("repeat_penalty", 1.3),
+        repeat_last_n=gen_cfg.get("repeat_last_n", 512),
+        keep_alive=config.get("agent", {}).get("keep_alive", True)
+    )
     logger.info("✓ Modelo carregado!")
     tui.model_loaded()
     
@@ -113,79 +150,109 @@ def run_single_benchmark(
     processed_ids = {r.get("question_id") for r in results}
     
     try:
-        # Loop de questões (iterando diretamente no dataset, sem converter para lista)
+        # Loop de questões (sob demanda, sem carregar tudo em memória)
         q_idx = start_index
-        for full_q in tqdm(dataset, desc=f"[{model}]", initial=start_index, total=total):
-            # Pular questões já processadas
-            if full_q.question_id in processed_ids:
-                continue
-            
-            q_idx += 1
-            logger.info(f"📝 [{q_idx}/{total}] {full_q.question_id} ({full_q.difficulty})")
-            
-            # Atualizar estado TUI - início da questão
-            tui.start_question(full_q.question_id, full_q.difficulty, q_idx, total)
-            
-            q_start = time.time()
-            try:
-                if agent:
-                    code = agent.generate_code_from_question_dataset(full_q)
-                else:
-                    code, _ = multi_agent.solve_question_dataset(full_q)
-                code_time = time.time() - q_start
+        pending_count = total - start_index
+        
+        if pending_count <= 0:
+            logger.info("✅ Todas as questões já foram processadas!")
+            tui.finish_run(success=True)
+            metrics = calculate_metrics(results)
+            total_time = sum(r.get("total_time", 0.0) for r in results)
+            return {
+                "model": model, "architecture": architecture,
+                "total_questions": total, "score": metrics["score"],
+                "difficulty_stats": metrics["difficulty_stats"],
+                "total_time": total_time, "total_test_time": total_time,
+                "total_input_tokens": acc_in_tokens, "total_output_tokens": acc_out_tokens,
+                "results": results,
+            }
+        
+        logger.info(f"📋 Pendentes: {pending_count} questões")
+        
+        with tqdm(total=pending_count, desc=f"[{model}]") as pbar:
+            for full_q in dataset:
+                # Pular questões já processadas
+                if full_q.question_id in processed_ids:
+                    continue
                 
-                q_in = active_handler.total_input_tokens - cur_in
-                q_out = active_handler.total_output_tokens - cur_out
+                q_idx += 1
+                logger.info(f"📝 [{q_idx}/{total}] {full_q.question_id} ({full_q.difficulty})")
                 
-                # Atualizar tokens na TUI
-                tui.update_question_tokens(q_in, q_out)
+                # Atualizar estado TUI - início da questão
+                tui.start_question(full_q.question_id, full_q.difficulty, q_idx, total)
                 
-                # Executar testes
-                tui.start_tests(len(full_q.private_test_cases))
-                test_result = test_runner.run(TestSuiteBase(test_cases=full_q.private_test_cases), code)
+                q_start = time.time()
+                try:
+                    if agent:
+                        code = agent.generate_code_from_question_dataset(full_q)
+                        history = None
+                    else:
+                        code, history = multi_agent.solve_question_dataset(full_q)
+                    code_time = time.time() - q_start
+                    
+                    q_in = active_handler.total_input_tokens - cur_in
+                    q_out = active_handler.total_output_tokens - cur_out
+                    
+                    # Atualizar tokens na TUI
+                    tui.update_question_tokens(q_in, q_out)
+                    
+                    # Executar testes
+                    tui.start_tests(len(full_q.private_test_cases))
+                    test_result = test_runner.run(TestSuiteBase(test_cases=full_q.private_test_cases), code)
+                    
+                    # Salvar histórico em arquivo separado (se existir)
+                    history_file = save_history_file(results_dir, model, full_q.question_id, history)
+                    
+                    result = {
+                        "question_id": full_q.question_id, "difficulty": full_q.difficulty,
+                        "total_time": time.time() - q_start, "code_generation_time": code_time,
+                        "passed_tests": test_result.passed_tests, "total_tests": test_result.total_tests,
+                        "success_rate": test_result.success_rate,
+                        "total_input_tokens": q_in, "total_output_tokens": q_out,
+                        "error": None, "traceback": None,
+                        "code": code,
+                        "history_file": history_file,  # Referência ao arquivo, não o histórico completo
+                    }
+                except Exception as e:
+                    logger.error(f"Erro em {full_q.question_id}: {e}")
+                    q_in = active_handler.total_input_tokens - cur_in
+                    q_out = active_handler.total_output_tokens - cur_out
+                    result = {
+                        "question_id": full_q.question_id, "difficulty": full_q.difficulty,
+                        "total_time": time.time() - q_start, "code_generation_time": 0.0,
+                        "passed_tests": 0, "total_tests": 0, "success_rate": 0.0,
+                        "total_input_tokens": q_in, "total_output_tokens": q_out,
+                        "error": str(e), "traceback": traceback.format_exc(),
+                    }
                 
-                result = {
-                    "question_id": full_q.question_id, "difficulty": full_q.difficulty,
-                    "total_time": time.time() - q_start, "code_generation_time": code_time,
-                    "passed_tests": test_result.passed_tests, "total_tests": test_result.total_tests,
-                    "success_rate": test_result.success_rate,
-                    "total_input_tokens": q_in, "total_output_tokens": q_out,
-                    "error": None, "traceback": None,
-                }
-            except Exception as e:
-                logger.error(f"Erro em {full_q.question_id}: {e}")
-                q_in = active_handler.total_input_tokens - cur_in
-                q_out = active_handler.total_output_tokens - cur_out
-                result = {
-                    "question_id": full_q.question_id, "difficulty": full_q.difficulty,
-                    "total_time": time.time() - q_start, "code_generation_time": 0.0,
-                    "passed_tests": 0, "total_tests": 0, "success_rate": 0.0,
-                    "total_input_tokens": q_in, "total_output_tokens": q_out,
-                    "error": str(e), "traceback": traceback.format_exc(),
-                }
-            
-            cur_in, cur_out = active_handler.total_input_tokens, active_handler.total_output_tokens
-            acc_in_tokens += result["total_input_tokens"]
-            acc_out_tokens += result["total_output_tokens"]
-            results.append(result)
-            
-            # Atualizar estado TUI - fim da questão
-            tui.finish_question(result)
-            
-            icon = "✅" if result["success_rate"] == 1.0 else ("⚠️" if result["success_rate"] > 0 else "❌")
-            logger.info(f"  {icon} {result['success_rate']*100:.0f}% ({result['passed_tests']}/{result['total_tests']})")
-            
-            # Checkpoint
-            save_checkpoint(checkpoint_path, model, architecture, results)
+                cur_in, cur_out = active_handler.total_input_tokens, active_handler.total_output_tokens
+                acc_in_tokens += result["total_input_tokens"]
+                acc_out_tokens += result["total_output_tokens"]
+                results.append(result)
+                
+                # Atualizar estado TUI - fim da questão
+                tui.finish_question(result)
+                
+                icon = "✅" if result["success_rate"] == 1.0 else ("⚠️" if result["success_rate"] > 0 else "❌")
+                logger.info(f"  {icon} {result['success_rate']*100:.0f}% ({result['passed_tests']}/{result['total_tests']})")
+                
+                # Salva direto em results (atômico)
+                save_checkpoint(result_path, model, architecture, results)
+                
+                # Atualiza barra de progresso
+                pbar.update(1)
         
         # Finalizar
         tui.finish_run(success=True)
-        total_time = time.time() - start_time
+        
+        # Calcula tempo total baseado na soma dos tempos individuais (mais preciso com checkpoint)
+        total_time = sum(r.get("total_time", 0.0) for r in results)
         metrics = calculate_metrics(results)
         
         final = {
             "model": model, "architecture": architecture,
-            "total_test_time": total_time,
+            "total_test_time": total_time,  # Agora é a soma dos tempos individuais
             "total_input_tokens": acc_in_tokens, "total_output_tokens": acc_out_tokens,
             "score": metrics["score"],
             "tokens_per_second": acc_out_tokens / total_time if total_time > 0 else 0,
@@ -196,7 +263,6 @@ def run_single_benchmark(
         
         logger.info("💾 Salvando resultados...")
         save_results(result_path, final)
-        clear_checkpoint(checkpoint_path)
         logger.info("🎉 Benchmark concluído!")
         
         return final

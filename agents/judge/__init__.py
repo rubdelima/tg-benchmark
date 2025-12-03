@@ -129,7 +129,7 @@ class Will:
             ]
         
         
-        logger.info("Judge: Evaluating code and suggesting solution improvements.")
+        logger.debug("Judge: Evaluating code and suggesting solution improvements.")
         start_time = time.time()
         with StatusContext("Judge: Evaluating code and suggesting solution improvements") as status:
             response = self.ollama_handler.chat(messages=messages)

@@ -40,13 +40,24 @@ class ChatResponse(BaseModel, Generic[T]):
     raw_response: Dict[str, Any]
 
 class OllamaHandler:
-    def __init__(self, model_name: str, temperature: float = 0.0, keep_alive: bool=False):
+    def __init__(
+        self, 
+        model_name: str, 
+        temperature: float = 0.0, 
+        max_tokens: int = 16384,
+        repeat_penalty: float = 1.3,
+        repeat_last_n: int = 512,
+        keep_alive: bool = False
+    ):
         if not self._check_ollama_installed():
             raise EnvironmentError(
                 "Ollama CLI is not installed or not found in PATH.")
         self.check_and_pull_model(model_name)
         self.model_name = model_name
         self.temperature = temperature
+        self.max_tokens = max_tokens
+        self.repeat_penalty = repeat_penalty
+        self.repeat_last_n = repeat_last_n
         if keep_alive:
             ollama.chat( # type: ignore
                 model=model_name,
@@ -121,7 +132,12 @@ class OllamaHandler:
         stream_response = ollama.chat( #type: ignore
             model=self.model_name,
             messages=messages,
-            options={"temperature": self.temperature, "num_predict": 8192},
+            options={
+                "temperature": self.temperature, 
+                "num_predict": self.max_tokens,
+                "repeat_penalty": self.repeat_penalty,   
+                "repeat_last_n": self.repeat_last_n
+            },
             format=ollama_format, # type: ignore
             stream=True
         )
@@ -225,3 +241,4 @@ class OllamaHandler:
             ["ollama", "stop", self.model_name],
             capture_output=True, text=True
         )
+        time.sleep(2)

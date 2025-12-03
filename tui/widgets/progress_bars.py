@@ -12,11 +12,11 @@ from rich.console import RenderableType
 from typing import Optional
 
 from ..state.models import LauncherState, RunState
+from ..utils.colors import get_color_for_percentage
 
 
 class CustomProgressBar(Static):
     """A custom progress bar widget using Rich Text for full control."""
-    
     DEFAULT_CSS = """
     CustomProgressBar {
         width: 100%;
@@ -33,12 +33,14 @@ class CustomProgressBar(Static):
         label: str = "",
         bar_color: str = "green",
         bg_color: str = "grey23",
+        dynamic_color: bool = False,
         **kwargs
     ):
         super().__init__(**kwargs)
         self.label = label
         self.bar_color = bar_color
         self.bg_color = bg_color
+        self.dynamic_color = dynamic_color
         self._current = 0
         self._total = 0
     
@@ -65,32 +67,41 @@ class CustomProgressBar(Static):
         # Calculate filled portion
         if self._total > 0:
             filled = int((self._current / self._total) * bar_width)
+            percentage = (self._current / self._total) * 100
         else:
             filled = 0
+            percentage = 0
         
         filled = min(filled, bar_width)
         empty = bar_width - filled
+        
+        # Determine bar color (dynamic or static)
+        if self.dynamic_color:
+            current_bar_color = get_color_for_percentage(percentage)
+        else:
+            current_bar_color = self.bar_color
         
         # Build the text
         result = Text()
         result.append(label_text, style="bold")
         result.append("[", style="dim")
-        result.append("█" * filled, style=self.bar_color)
+        result.append("█" * filled, style=current_bar_color)
         result.append("░" * empty, style=self.bg_color)
         result.append("]", style="dim")
-        result.append(info_text, style="cyan")
+        result.append(info_text, style=current_bar_color)
         
         return result
     
-    def update_progress(self, current: int, total: int) -> None:
-        """Update the progress bar."""
+    def update_progress(self, current: float, total: int) -> None:
+        """Update the progress bar. Current can be float for partial progress."""
         self._current = current
         self._total = total
         
         if total > 0:
             self.progress = current / total
             percentage = (current / total) * 100
-            self.info = f"{current}/{total} ({percentage:.1f}%)"
+            # Show as integer values
+            self.info = f"{int(current)}/{total} ({percentage:.1f}%)"
         else:
             self.progress = 0.0
             self.info = "0/0 (0.0%)"
@@ -108,8 +119,8 @@ class ProgressBarsWidget(Static):
     
     Structure:
     ┌─────────────────────────────────────────────────────────────────┐
-    │ 📦 Progresso Total (Modelos): [████████░░░░░░░░░░] 5/18 (27.8%)│
-    │ 📝 Progresso Atual (Questões): [██████████░░░░░░░] 15/100 (15%)│
+    │ 📦 Progresso Total:  [████████░░░░░░░░░░] 450/2070 (21.7%)     │
+    │ 📝 Progresso Atual:  [██████████░░░░░░░] 15/90 (16.7%)         │
     └─────────────────────────────────────────────────────────────────┘
     """
     
@@ -139,12 +150,12 @@ class ProgressBarsWidget(Static):
     def compose(self) -> ComposeResult:
         with Vertical():
             yield CustomProgressBar(
-                label="📦 Progresso Total (Modelos):",
+                label="📦 Progresso Total: ",
                 bar_color="bright_blue",
                 id="launcher-progress"
             )
             yield CustomProgressBar(
-                label="📝 Progresso Atual (Questões):",
+                label="📝 Progresso Atual: ",
                 bar_color="bright_green",
                 id="run-progress"
             )
@@ -167,7 +178,7 @@ class ProgressBarsWidget(Static):
         except Exception:
             pass
     
-    def update_launcher_progress(self, current: int, total: int) -> None:
+    def update_launcher_progress(self, current: float, total: int) -> None:
         """Public method to update launcher progress"""
         self.launcher_progress = (current, total)
     

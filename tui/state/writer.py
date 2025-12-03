@@ -79,18 +79,46 @@ class TUIStateWriter:
         
         return (total_weighted / total_weight * 100) if total_weight > 0 else 0.0
     
-    def start_run(self, model: str, architecture: str, total_questions: int) -> None:
-        """Inicia uma nova execução"""
+    def start_run(
+        self,
+        model: str,
+        architecture: str,
+        total_questions: int,
+        resumed_results: Optional[List[Dict[str, Any]]] = None,
+    ) -> None:
+        """Inicia uma nova execução, opcionalmente com resultados recuperados do checkpoint."""
         self._model = model
         self._architecture = architecture
         self._status = "loading_model"
         self._started_at = datetime.now()
         self._total_questions = total_questions
-        self._completed_questions = 0
         self._current_question = None
-        self._total_input_tokens = 0
-        self._total_output_tokens = 0
-        self._results = []
+        
+        # Se tiver resultados do checkpoint, usa eles
+        if resumed_results:
+            self._results = []
+            for r in resumed_results:
+                self._results.append({
+                    "question_id": r.get("question_id", ""),
+                    "difficulty": r.get("difficulty", "unknown"),
+                    "total_time": r.get("total_time", 0.0),
+                    "passed_tests": r.get("passed_tests", 0),
+                    "total_tests": r.get("total_tests", 0),
+                    "success_rate": r.get("success_rate", 0.0),
+                    "code_generation_time": r.get("code_generation_time", 0.0),
+                    "input_tokens": r.get("total_input_tokens", 0),
+                    "output_tokens": r.get("total_output_tokens", 0),
+                    "error": r.get("error"),
+                })
+            self._completed_questions = len(self._results)
+            self._total_input_tokens = sum(r.get("input_tokens", 0) for r in self._results)
+            self._total_output_tokens = sum(r.get("output_tokens", 0) for r in self._results)
+        else:
+            self._completed_questions = 0
+            self._total_input_tokens = 0
+            self._total_output_tokens = 0
+            self._results = []
+        
         self._write_state()
     
     def model_loaded(self) -> None:

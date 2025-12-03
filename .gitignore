@@ -16,3 +16,6 @@ wheels/
 
 .tui_state/
 .checkpoints/
+
+# Results History
+results/*/

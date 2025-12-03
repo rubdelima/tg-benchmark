@@ -9,6 +9,7 @@ Uso:
     python main.py --no-resume         # Ignorar checkpoints
 """
 import argparse
+import json
 import sys
 from pathlib import Path
 from itertools import product
@@ -28,6 +29,19 @@ logger = get_logger(__name__)
 console = Console()
 
 
+def is_benchmark_complete(result_path: Path, expected_total: int) -> bool:
+    """Verifica se um benchmark está completo (todas as questões resolvidas)."""
+    if not result_path.exists():
+        return False
+    try:
+        with open(result_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        results = data.get("results", [])
+        return len(results) >= expected_total
+    except:
+        return False
+
+
 def load_config(path: str = "config.yaml") -> Dict[str, Any]:
     """Carrega configuração YAML."""
     with open(path, "r", encoding="utf-8") as f:
@@ -45,12 +59,24 @@ def get_models_list(config: Dict[str, Any]) -> List[str]:
 
 
 def get_grid(config: Dict[str, Any]) -> List[Tuple[str, str]]:
-    """Gera grid modelo x arquitetura."""
+    """
+    Gera grid modelo x arquitetura.
+    
+    Nota: Modelos com "cloud" no nome do parâmetro só rodam em "simple",
+    pois usam APIs externas que não suportam o fluxo multi-agent.
+    """
     models = get_models_list(config)
     archs = config.get("benchmark", {}).get("architectures", ["simple"])
-    if config.get("benchmark", {}).get("test_all_combinations", True):
-        return list(product(models, archs))
-    return [(m, archs[0]) for m in models]
+    
+    grid = []
+    for model in models:
+        for arch in archs:
+            # Modelos "cloud" NUNCA rodam em multi-agent
+            if "cloud" in model.lower() and arch == "multi-agent":
+                continue
+            grid.append((model, arch))
+    
+    return grid
 
 
 def run_grid(
@@ -69,8 +95,16 @@ def run_grid(
     paths = config.get("paths", {})
     results_dir = paths.get("results", "./results/")
     
-    # Filtrar pendentes
-    pending = [(m, a) for m, a in grid if not get_result_path(m, a, results_dir).exists() or not resume]
+    # Calcula total esperado de questões
+    ds_cfg = config.get("dataset", {})
+    expected_total = ds_cfg.get("easy_samples", 30) + ds_cfg.get("medium_samples", 30) + ds_cfg.get("hard_samples", 30)
+    
+    # Filtrar pendentes - verifica se está COMPLETO, não só se existe
+    pending = []
+    for m, a in grid:
+        result_path = get_result_path(m, a, results_dir)
+        if not resume or not is_benchmark_complete(result_path, expected_total):
+            pending.append((m, a))
     
     total, done = len(grid), len(grid) - len(pending)
     
