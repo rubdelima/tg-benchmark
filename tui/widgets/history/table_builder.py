@@ -33,11 +33,22 @@ def sort_data(
     sort_column: str,
     sort_reverse: bool,
     display_configs: List[str],
+    use_select_sort: bool = False,
 ) -> List[Dict]:
-    """Ordena dados pela coluna especificada."""
+    """
+    Ordena dados pela coluna especificada.
+    
+    Se use_select_sort=True, sort_column é o valor do Select (ex: 'id_asc', 'difficulty_desc')
+    Se use_select_sort=False, sort_column é a key da coluna clicada no header
+    """
     if not sort_column:
         return sorted(data, key=lambda x: x["question_id"])
     
+    # Ordenação via Select (dropdown)
+    if use_select_sort:
+        return _sort_by_select(data, sort_column)
+    
+    # Ordenação via clique no header da tabela
     if sort_column == "question_id":
         return sorted(data, key=lambda x: x["question_id"], reverse=sort_reverse)
     elif sort_column == "difficulty":
@@ -51,6 +62,25 @@ def sort_data(
     else:
         # Ordenar por coluna de config específica
         return _sort_by_config_column(data, sort_column, sort_reverse, display_configs)
+
+
+def _sort_by_select(data: List[Dict], sort_option: str) -> List[Dict]:
+    """Ordena dados baseado na opção selecionada no Select."""
+    reverse = sort_option.endswith("_desc")
+    sort_key = sort_option.replace("_asc", "").replace("_desc", "")
+    
+    if sort_key == "id":
+        return sorted(data, key=lambda x: x["question_id"], reverse=reverse)
+    elif sort_key == "difficulty":
+        return sorted(
+            data,
+            key=lambda x: DIFFICULTY_ORDER.get(x["difficulty"], 99),
+            reverse=reverse
+        )
+    elif sort_key == "avg":
+        return sorted(data, key=lambda x: x["avg_score"], reverse=reverse)
+    
+    return data
 
 
 def _sort_by_config_column(

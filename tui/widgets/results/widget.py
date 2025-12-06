@@ -13,7 +13,7 @@ from ...state.models import CompletedRunSummary
 from ...utils.formatters import format_tokens
 from .styles import WIDGET_CSS, COLUMNS, SORT_OPTIONS
 from .formatters import (
-    format_time, format_difficulty_stats, format_score, truncate_model_name
+    format_time, format_difficulty_stats, format_score, format_model_name, format_params
 )
 
 
@@ -146,7 +146,8 @@ class ResultsTableWidget(Static):
             pass
     
     def _add_result_row(self, table: DataTable, result: CompletedRunSummary) -> None:
-        model_text = truncate_model_name(result.model)
+        model_text = format_model_name(result.model)
+        params_text = format_params(result.model)
         arch_text = "simple" if result.architecture == "simple" else "multi"
         tokens_out = format_tokens(result.total_output_tokens)
         total_time = Text(format_time(result.total_time).rjust(8))
@@ -166,7 +167,7 @@ class ResultsTableWidget(Static):
         
         score = format_score(result.score)
         
-        table.add_row(model_text, arch_text, tokens_out, total_time, avg_time, 
+        table.add_row(model_text, params_text, arch_text, tokens_out, total_time, avg_time, 
                       tks_per_sec, easy, medium, hard, total, score)
     
     # ==================== Public Methods ====================

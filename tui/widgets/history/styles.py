@@ -22,6 +22,7 @@ HistoryTableWidget #model-selection-list { height: auto; max-height: 10; width: 
 HistoryTableWidget #column-selection-list { height: auto; max-height: 6; width: 100%; }
 HistoryTableWidget #search-input { width: 30; }
 HistoryTableWidget #difficulty-filter { width: 15; }
+HistoryTableWidget #sort-filter { width: 18; }
 HistoryTableWidget .filter-label { width: auto; padding: 0 1; content-align: center middle; }
 HistoryTableWidget DataTable { height: 1fr; }
 """
@@ -47,3 +48,13 @@ DIFFICULTY_ORDER = {
     "hard": 2,
     "unknown": 99,
 }
+
+# Opções de ordenação para a tabela de histórico
+SORT_OPTIONS = [
+    ("ID (A-Z)", "id_asc"),
+    ("ID (Z-A)", "id_desc"),
+    ("Dificuldade ↑", "difficulty_asc"),
+    ("Dificuldade ↓", "difficulty_desc"),
+    ("AVG ↑", "avg_asc"),
+    ("AVG ↓", "avg_desc"),
+]

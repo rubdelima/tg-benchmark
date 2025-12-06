@@ -48,25 +48,22 @@ benchmark:
       - 1b
       - 4b
       - 12b
-    
-    qwen3:
-      - 1.7b
-      - 8b
-      - 14b
+
+    qwen3-coder:
+      - 480b-cloud
+
+    gpt-oss:
+      - 20b
     
     qwen2.5-coder:
       - 1.5b
       - 7b
       - 14b
     
-    gpt-oss:
-      - 20b
-
-    devstral:
-      - latest
-    
-    qwen3-coder:
-      - 480b-cloud
+    qwen3:
+      - 1.7b
+      - 8b
+      - 14b
 
 
 # =============================================================================

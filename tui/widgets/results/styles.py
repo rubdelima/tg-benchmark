@@ -24,7 +24,8 @@ ResultsTableWidget DataTable { height: 1fr; }
 
 # Definição das colunas com chaves para ordenação
 COLUMNS = [
-    ("Model", "model"),
+    ("Modelo", "model"),
+    ("Params", "params"),
     ("Arch", "arch"),
     ("Tks Out", "tokens_out"),
     ("T.Total", "total_time"),

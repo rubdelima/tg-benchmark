@@ -10,7 +10,7 @@ from typing import List, Dict, Optional, Set
 from pathlib import Path
 
 from .data_loader import HistoryDataLoader
-from .styles import WIDGET_CSS, AVAILABLE_COLUMNS
+from .styles import WIDGET_CSS, AVAILABLE_COLUMNS, SORT_OPTIONS
 from .table_builder import filter_data, sort_data, build_table_columns, add_table_row
 
 
@@ -23,6 +23,7 @@ class HistoryTableWidget(Static):
     DEFAULT_CSS = WIDGET_CSS
     _sort_column: Optional[str] = None
     _sort_reverse: bool = False
+    _current_sort: Optional[str] = "id_asc"
     
     def __init__(self, results_dir: str = "./results/", dataset_path: str = "./data/dataset.jsonl", **kwargs):
         super().__init__(**kwargs)
@@ -32,6 +33,7 @@ class HistoryTableWidget(Static):
         self._table_data: List[Dict] = []
         self._current_search = ""
         self._current_difficulty = "all"
+        self._current_sort = "id_asc"
     
     def compose(self) -> ComposeResult:
         with Vertical():
@@ -44,6 +46,8 @@ class HistoryTableWidget(Static):
                     [("Todas", "all"), ("Fácil", "easy"), ("Médio", "medium"), ("Difícil", "hard")],
                     value="all", id="difficulty-filter", allow_blank=False,
                 )
+                yield Static("🔃", classes="filter-label")
+                yield Select(SORT_OPTIONS, value="id_asc", id="sort-filter", allow_blank=False)
                 yield Button("📊 Modelos ▼", id="toggle-models-btn", variant="default")
                 yield Button("📋 Colunas ▼", id="toggle-columns-btn", variant="default")
             with Vertical(id="model-selection-container"):
@@ -118,11 +122,16 @@ class HistoryTableWidget(Static):
         if event.select.id == "difficulty-filter":
             self._current_difficulty = str(event.value)
             self._rebuild_filtered_table()
+        elif event.select.id == "sort-filter":
+            self._current_sort = str(event.value)
+            self._rebuild_filtered_table()
     
     def on_data_table_header_selected(self, event: DataTable.HeaderSelected) -> None:
         col = str(event.column_key)
         self._sort_reverse = not self._sort_reverse if self._sort_column == col else False
         self._sort_column = col
+        # Reseta o sort do Select quando clica no header
+        self._current_sort = None
         self._rebuild_filtered_table()
     
     # ==================== Table Building ====================
@@ -139,7 +148,12 @@ class HistoryTableWidget(Static):
             build_table_columns(table, display_configs, self._selected_columns)
             
             filtered = filter_data(self._table_data, self._current_search, self._current_difficulty)
-            sorted_data = sort_data(filtered, self._sort_column, self._sort_reverse, display_configs)
+            
+            # Usa _current_sort se definido, senão usa o clique no header
+            if self._current_sort:
+                sorted_data = sort_data(filtered, self._current_sort, False, display_configs, use_select_sort=True)
+            else:
+                sorted_data = sort_data(filtered, self._sort_column or "", self._sort_reverse, display_configs, use_select_sort=False)
             
             for row_data in sorted_data:
                 add_table_row(table, row_data, display_configs, self._selected_columns)
