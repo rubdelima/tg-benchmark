@@ -40,9 +40,6 @@ benchmark:
     - "simple"
     - "multi-agent"
   
-  # Modelos disponíveis para teste
-  # Formato: nome_modelo: [lista de parâmetros]
-  # Será convertido para "nome_modelo:parametro" (ex: gemma3:1b)
   models:
     gemma3:
       - 1b
@@ -64,12 +61,14 @@ benchmark:
       - 1.7b
       - 8b
       - 14b
+    
+    kimi-k2:
+      - 1t-cloud
 
 
 # =============================================================================
-# Multi-Agent Configuration (Configurações do agente Davi)
+# Multi-Agent Configuration
 # =============================================================================
 
 multi_agent:
-  # Número máximo de tentativas de melhoria do código
   max_retries: 3
